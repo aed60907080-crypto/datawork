@@ -9,7 +9,7 @@ https://claude.ai/artifact/77xEND12PeCtC2XESgzGGJ
 
 عند أول فتح تظهر شاشة **الضبط الأول** لاختيار كلمات سر الجهات.
 
-**على GitHub Pages:** https://aed60907080-crypto.github.io/MyWork/ (البيانات تُحفظ على المتصفح نفسه فقط)
+**على GitHub Pages:** https://aed60907080-crypto.github.io/datawork/ (البيانات تُحفظ على المتصفح نفسه فقط)
 
 **تشغيل محلي:** افتح الملف `index.html` في المتصفح مباشرة.
 في هذا الوضع تُحفظ البيانات على المتصفح نفسه فقط (localStorage) ولا تُشارَك مع الآخرين،
@@ -29,7 +29,7 @@ https://claude.ai/artifact/77xEND12PeCtC2XESgzGGJ
 
 ## التثبيت كتطبيق
 
-النظام تطبيق ويب قابل للتثبيت (PWA) من رابط GitHub Pages: https://aed60907080-crypto.github.io/MyWork/
+النظام تطبيق ويب قابل للتثبيت (PWA) من رابط GitHub Pages: https://aed60907080-crypto.github.io/datawork/
 
 - **أندرويد / Chrome / Edge على الحاسب:** افتح الرابط ثم اضغط زر **«تثبيت التطبيق»** في الشريط العلوي (أو من قائمة المتصفح ← تثبيت التطبيق).
 - **آيفون / آيباد (Safari):** افتح الرابط ← زر المشاركة ← **إضافة إلى الشاشة الرئيسية**.
