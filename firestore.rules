@@ -1,6 +1,6 @@
 rules_version = '2';
 
-// قواعد أمان سجل صيانة الأجهزة
+// قواعد أمان سجل صيانة الأجهزة — المركز الحكومي
 // استبدل YOUR-PROJECT.firebaseapp.com بقيمة authDomain لمشروعك قبل النشر.
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -8,23 +8,16 @@ service cloud.firestore {
     function email() {
       return request.auth != null ? request.auth.token.email : '';
     }
-    function isMain()  { return email() == 'main@YOUR-PROJECT.firebaseapp.com'; }
-    function isGov()   { return email() in ['gov@YOUR-PROJECT.firebaseapp.com',
-                                            'gov-supervisor@YOUR-PROJECT.firebaseapp.com']; }
+    function isGov()   { return email() == 'gov@YOUR-PROJECT.firebaseapp.com'; }
     function isChief() { return email() == 'chief@YOUR-PROJECT.firebaseapp.com'; }
-    function isStaff() { return isMain() || isGov() || isChief(); }
+    function isStaff() { return isGov() || isChief(); }
 
-    // قاعدة المبنى الرئيسي: موظفوه ورئيس القسم فقط
-    match /sites/MB/{path=**} {
-      allow read, write: if isMain() || isChief();
-    }
-
-    // قاعدة المركز الحكومي: موظفوه ومشرف الفريق ورئيس القسم فقط
+    // قاعدة المركز الحكومي: حساب المركز ورئيس الفريق فقط
     match /sites/GC/{path=**} {
-      allow read, write: if isGov() || isChief();
+      allow read, write: if isStaff();
     }
 
-    // المشترك: القوائم واسم رئيس القسم والفنيون لكلا الموقعين
+    // المشترك: القوائم واسم رئيس الفريق والفنيون
     match /config/{doc} {
       allow read, write: if isStaff();
     }

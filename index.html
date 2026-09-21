@@ -476,7 +476,7 @@ table.tbl .r{text-align:end}
 .pick[data-k="__admin"] .mark{background:var(--site-b); opacity:.55}
 .pick[data-k="__chief"] .mark{background:var(--c5)}
 
-/* ---- مشرف الفريق داخل خانة المركز الحكومي ---- */
+/* ---- إدارة المركز داخل خانة المركز الحكومي ---- */
 .pick-group{border:1.5px solid var(--line); border-radius:var(--r-m); background:var(--surface-2); overflow:hidden}
 .pick-group.on{border-color:var(--site-b)}
 .pick-group > .pick{border:0; border-radius:0; background:transparent}
@@ -528,7 +528,7 @@ table.tbl .r{text-align:end}
 }
 .pw-eye:hover{color:var(--ink); background:var(--surface-3)}
 
-/* ---- لوحة رئيس القسم ---- */
+/* ---- لوحة رئيس الفريق ---- */
 .chief-band{border-inline-start:3px solid var(--c5); background:var(--surface); border:1px solid var(--line);
   border-inline-start-width:3px; border-radius:var(--r-l); padding:14px 16px; margin-bottom:16px;
   display:flex; gap:14px; align-items:center; flex-wrap:wrap}
@@ -564,7 +564,7 @@ table.tbl .r{text-align:end}
 .pw-head .ds{font-size:11.5px; color:var(--ink-3)}
 .pw-fields{display:grid; grid-template-columns:1fr 1fr auto; gap:10px; align-items:end}
 
-/* ---- تبويبات مشرف الفريق ---- */
+/* ---- تبويبات إدارة المركز ---- */
 .seg{display:flex; gap:4px; flex-wrap:wrap; padding:4px; margin-bottom:16px; background:var(--surface);
   border:1px solid var(--line); border-radius:var(--r-l); width:fit-content; max-width:100%}
 .seg-b{display:inline-flex; align-items:center; gap:7px; border:0; background:none; cursor:pointer;
@@ -618,6 +618,35 @@ table.tbl tbody tr.unread td{background:var(--warn-soft)}
 table.tbl tbody tr.unread td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
 @media (max-width:640px){ .pw-fields{grid-template-columns:1fr} .pw-fields .btn{justify-content:center} }
 .pw-eye svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+
+/* ---- الهاتف الذكي: شريط تبويبات سفلي كتطبيق ---- */
+@media (max-width:640px){
+  .nav{position:fixed; inset-inline:0; bottom:0; top:auto; z-index:40; height:auto;
+    padding:4px 6px calc(4px + env(safe-area-inset-bottom,0px));
+    border:0; border-top:1px solid var(--line); box-shadow:0 -6px 18px -10px rgba(17,34,38,.35)}
+  .nav .brand{display:none}
+  .nav-list{margin-top:0; gap:2px; padding-bottom:0; scrollbar-width:none}
+  .nav-list::-webkit-scrollbar{display:none}
+  .nav-b{position:relative; flex-direction:column; justify-content:center; gap:3px; min-width:68px;
+    padding:6px 6px 5px; font-size:10.5px; line-height:1.25; text-align:center; white-space:normal}
+  .nav-b .ic{width:21px; height:21px}
+  .nav-b .badge{position:absolute; top:2px; inset-inline-end:8px; margin:0; font-size:9.5px; padding:0 5px}
+  .main{padding-bottom:calc(74px + env(safe-area-inset-bottom,0px))}
+  .top{padding-top:env(safe-area-inset-top,0px)}
+  .top-in{padding:8px 12px; gap:8px}
+  .top-title{font-size:14px}
+  #newOrderBtn{padding:8px 11px}
+  .page{padding:12px}
+  .page-head{margin-bottom:12px}
+  .page-head h2{font-size:19px}
+  .inp, select.inp, textarea.inp{font-size:16px}
+  .btn{min-height:40px}
+  .veil{padding:0; align-items:flex-end}
+  .modal, .modal.lg{width:100%; max-height:94vh; border-radius:16px 16px 0 0}
+  .modal-f{padding-bottom:calc(13px + env(safe-area-inset-bottom,0px))}
+  .toast{inset-block-end:calc(84px + env(safe-area-inset-bottom,0px))}
+  .gate{padding:14px}
+}
 </style>
 
 <script>
@@ -651,7 +680,7 @@ const FIREBASE_CONFIG = {
 };
 const FIREBASE_SDK = "https://www.gstatic.com/firebasejs/10.12.2/";
 /* حساب Firebase لكل جهة: <الاسم>@<authDomain> — تُنشأ من Authentication في Firebase Console */
-const ROLE_USER = {"المبنى الرئيسي":"main", "المركز الحكومي":"gov", "__admin":"gov-supervisor", "__chief":"chief"};
+const ROLE_USER = {"المركز الحكومي":"gov", "__chief":"chief"};
 function roleEmail(scope){ return ROLE_USER[scope] ? ROLE_USER[scope]+"@"+FIREBASE_CONFIG.authDomain : ""; }
 function scopeOfEmail(email){
   email=String(email||"").toLowerCase();
@@ -777,7 +806,7 @@ document.addEventListener("click",ev=>{
 /* ============================================================
    3. طبقة التخزين — قاعدة بيانات مستقلة لكل موقع
    كل موقع له قاعدته: sites/MB/… للمبنى الرئيسي و sites/GC/… للمركز الحكومي.
-   الجهة لا تفتح إلا قاعدة موقعها، ورئيس القسم وحده يفتح القاعدتين وتُجمعان عنده.
+   النظام يعمل للمركز الحكومي وحده، فتُفتح قاعدة sites/GC فقط للمركز ولرئيس الفريق.
    المشترك بين الموقعين: القوائم وكلمات السر والفنيون المسجّلون «لكلا الموقعين».
    ============================================================ */
 const COLS = ["records","parts","movements","technicians","reports","employees","locations"];
@@ -875,7 +904,7 @@ const Store = {
     }
     if(this.ready) this.emit();
   },
-  /* القوائم واسم رئيس القسم: تُقرأ بعد الدخول فقط */
+  /* القوائم واسم رئيس الفريق: تُقرأ بعد الدخول فقط */
   _sharedOn(){
     if(this._sharedUnsubs) return;
     const cfgRef=this.db.doc("config/lists"), accRef=this.db.doc("config/access");
@@ -1218,11 +1247,11 @@ function kbToLatin(str){
 const ADMIN_KEY="__admin";
 const CHIEF_KEY="__chief";
 const PW_TARGETS=[
-  {k:SITES[0], nm:SITES[0],      ds:"موظفو المبنى الرئيسي — بياناته وحدها"},
-  {k:SITES[1], nm:SITES[1],      ds:"موظفو المركز الحكومي — بياناته وحدها"},
-  {k:CHIEF_KEY, nm:"رئيس القسم", ds:"يرى الموقعين وله لوحة خاصة لاعتماد الأوامر"},
-  {k:ADMIN_KEY, nm:"مشرف الفريق", ds:"مشرف المركز الحكومي — موظفوه وقطع غياره وكلمات سره"}
+  {k:SITES[1],  nm:SITES[1],     ds:"أوامر الصيانة والمخزن والتقارير"},
+  {k:CHIEF_KEY, nm:"رئيس الفريق", ds:"التقارير، والفنيون، وبدل الموقع، وإدارة المركز"}
 ];
+/* الصفحات المتاحة لرئيس الفريق */
+const CHIEF_VIEWS=["chief","reports","technicians","warehouse","places","supervisor","settings"];
 const Access={
   state:{scope:null},
   async hash(pass,salt){
@@ -1242,15 +1271,15 @@ const Access={
   /* في وضع Firebase: الحسابات تُنشأ من Firebase Console، فكل الجهات مضبوطة */
   auth(){ return Store.mode==="firebase"; },
   pwMin(){ return this.auth() ? 6 : 4; },
-  configured(){ if(this.auth()) return true; const e=this.entries(); return !!(e[SITES[0]]&&e[SITES[1]]); },
+  configured(){ if(this.auth()) return true; const e=this.entries(); return !!(e[SITES[1]]&&e[CHIEF_KEY]); },
   hasAdmin(){ return this.auth() || !!this.entries()[ADMIN_KEY]; },
   hasChief(){ return this.auth() || !!this.entries()[CHIEF_KEY]; },
   adopt(scope){
     this.state.scope=scope;
-    App.site = scope===CHIEF_KEY ? "الكل" : (scope===ADMIN_KEY ? SITES[1] : scope);
-    if(scope===CHIEF_KEY && App.view==="dashboard") App.view="chief";
+    App.site = SITES[1];
+    if(scope===CHIEF_KEY && CHIEF_VIEWS.indexOf(App.view)<0) App.view="chief";
   },
-  chiefName(){ return ((Store.access||{}).chiefName||"").trim() || "رئيس قسم الصيانة"; },
+  chiefName(){ return ((Store.access||{}).chiefName||"").trim() || "رئيس فريق الصيانة"; },
   async setMany(pairs){
     const a=Store.access||{};
     const acc={salt:a.salt||uid("slt"), entries:Object.assign({},a.entries||{})};
@@ -1271,7 +1300,7 @@ const Access={
   },
   signIn(scopeKey,remember){
     this.state.scope=scopeKey;
-    App.site = scopeKey===CHIEF_KEY ? "الكل" : (scopeKey===ADMIN_KEY ? SITES[1] : scopeKey);
+    App.site = SITES[1];
     if(scopeKey===CHIEF_KEY) App.view="chief";
     if(this.auth()) return; /* جلسة Firebase تحفظ الدخول بنفسها */
     const payload=JSON.stringify({scope:scopeKey, at:Date.now()});
@@ -1295,40 +1324,32 @@ const Access={
     if(!raw) return;
     try{
       const s=JSON.parse(raw), e=this.entries();
-      if(s && s.scope && e[s.scope]){
+      if(s && (s.scope===SITES[1]||s.scope===CHIEF_KEY) && e[s.scope]){
         this.state.scope=s.scope;
-        App.site = s.scope===CHIEF_KEY ? "الكل" : (s.scope===ADMIN_KEY ? SITES[1] : s.scope);
+        App.site = SITES[1];
         if(s.scope===CHIEF_KEY && App.view==="dashboard") App.view="chief";
       }
     }catch(e){}
   },
   in(){ return !!this.state.scope; },
-  isAdmin(){ return this.state.scope===ADMIN_KEY; },
+  isAdmin(){ return this.state.scope===SITES[1]; },
   isChief(){ return this.state.scope===CHIEF_KEY; },
-  bothSites(){ return this.isChief(); },
+  bothSites(){ return false; },
   label(){
-    if(this.isAdmin()) return "مشرف الفريق";
-    if(this.isChief()) return "رئيس القسم";
+    if(this.isChief()) return "رئيس الفريق";
+    if(this.isAdmin()) return SITES[1];
     return this.state.scope||"";
   }
 };
-function allowedSites(){
-  if(Access.bothSites()) return SITES.slice();
-  if(Access.isAdmin()) return [SITES[1]];
-  return Access.state.scope ? [Access.state.scope] : SITES.slice();
-}
+function allowedSites(){ return [SITES[1]]; }
 /* الموقع الذي تعمل عليه الجهة افتراضياً */
-function homeSite(){ return Access.isChief() ? "الكل" : (Access.isAdmin() ? SITES[1] : Access.state.scope); }
+function homeSite(){ return SITES[1]; }
 /* المواقع التي تستطيع الجهة إدارة موظفيها وقطع غيارها وطوابقها:
-   مشرف الفريق ← المركز الحكومي، وموظفو المبنى الرئيسي ← مبناهم */
-function manageSites(){
-  if(Access.isAdmin()) return [SITES[1]];
-  if(Access.state.scope===SITES[0]) return [SITES[0]];
-  return [];
-}
+   المركز الحكومي وحده */
+function manageSites(){ return Access.isChief() ? [SITES[1]] : []; }
 function canManage(site){ return manageSites().indexOf(site)>=0; }
 function canManageAny(){ return manageSites().length>0; }
-function managerTitle(){ return Access.isAdmin() ? "مشرف الفريق" : "إدارة "+SITES[0]; }
+function managerTitle(){ return "إدارة المركز"; }
 
 /* ============================================================
    4. تنزيل الملفات
@@ -1337,20 +1358,305 @@ async function download(filename, text, mime){
   let dl=null;
   try{ dl = (window.claude && window.claude.use) ? await window.claude.use("downloads") : null; }catch(e){}
   if(dl && dl.save){
-    try{ await dl.save({filename:filename, data:text}); toast("تم حفظ الملف: "+filename); return; }catch(e){}
+    try{ await dl.save({filename:filename, data:text}); toast("تم حفظ الملف: "+filename); return; }
+    catch(e){
+      const c=e&&e.code;
+      if(c==="declined"){ toast("أُلغي حفظ الملف"); return; }
+      if(c==="rate_limited"){ toast("نافذة حفظ مفتوحة بالفعل — أكملها أولاً"); return; }
+      if(c==="extension_not_enabled"||c==="rejected_extension"){ toast("هذا النوع من الملفات غير متاح هنا"); return; }
+    }
   }
   try{
-    const url=URL.createObjectURL(new Blob([text],{type:(mime||"text/plain")+";charset=utf-8"}));
+    const blob = (text instanceof Blob) ? text : new Blob([text],{type:(mime||"text/plain")+";charset=utf-8"});
+    const url=URL.createObjectURL(blob);
     const a=document.createElement("a"); a.href=url; a.download=filename;
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(()=>URL.revokeObjectURL(url),4000);
     toast("تم التنزيل: "+filename);
   }catch(e){
+    if(typeof text!=="string"){ toast("تعذّر تنزيل الملف في هذه النافذة"); return; }
     openModal({title:"نسخ المحتوى يدوياً", size:"lg",
       body:'<p class="note">تعذّر التنزيل المباشر داخل هذه النافذة. انسخ المحتوى التالي واحفظه في ملف باسم '+esc(filename)+'</p>'+
            '<textarea class="inp mono" rows="14" style="margin-top:12px" readonly>'+esc(text)+'</textarea>',
       actions:[{label:"إغلاق", cls:"btn", act:closeModal}]});
   }
+}
+
+/* ============================================================
+   4.5 التصدير إلى Excel — ملفات .xlsx منسّقة (من اليمين لليسار)
+   ============================================================ */
+const EXCELJS_SRC="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js";
+const XL={
+  font:"Arial",
+  teal:"FF00897A", tealDark:"FF065A50", tealSoft:"FFDBEFEC",
+  zebra:"FFF5F8F8", line:"FFD1DBDA", lineDark:"FFB4C3C1",
+  ink:"FF112226", ink2:"FF4D6064", ink3:"FF7B8C8F", white:"FFFFFFFF",
+  tone:{
+    ok:  {fill:"FFDEF0E5", font:"FF2E7D53"},
+    warn:{fill:"FFFAEDD7", font:"FFB9781A"},
+    crit:{fill:"FFF8E3E1", font:"FFA8322C"},
+    none:{fill:"FFECF2F1", font:"FF4D6064"}
+  }
+};
+let _xlLoading=null;
+async function xlsxLib(){
+  if(window.ExcelJS) return window.ExcelJS;
+  if(!_xlLoading) _xlLoading=loadScript(EXCELJS_SRC).catch(e=>{ _xlLoading=null; throw e; });
+  await _xlLoading;
+  return window.ExcelJS;
+}
+function xlFill(argb){ return {type:"pattern", pattern:"solid", fgColor:{argb:argb}}; }
+function xlBorder(argb){ const s={style:"thin", color:{argb:argb||XL.line}}; return {top:s, left:s, bottom:s, right:s}; }
+function xlStatusTone(v){
+  const t=STATUS_TONE[v];
+  if(t==="ok") return XL.tone.ok;
+  if(t==="warn") return XL.tone.warn;
+  if(t==="crit") return XL.tone.crit;
+  return XL.tone.none;
+}
+/* عرض العمود حسب أطول قيمة فيه */
+function xlWidth(col, rows, i){
+  if(col.w) return col.w;
+  let m=String(col.h).length+2;
+  rows.forEach(r=>{ const v=r[i]; const s=v==null?"":String(v); m=Math.max(m, Math.min(60, s.length+2)); });
+  return Math.max(9, Math.min(48, Math.round(m*1.12)));
+}
+/* ورقة جديدة: اتجاه من اليمين، طباعة A4 أفقية بعرض صفحة واحدة، وتذييل برقم الصفحة */
+function xlNewSheet(wb, name, opt){
+  opt=opt||{};
+  const ws=wb.addWorksheet(String(name).slice(0,31), {
+    views:[{rightToLeft:true, showGridLines:false}],
+    properties:{defaultRowHeight:20, tabColor:{argb:opt.tab||XL.teal}},
+    pageSetup:{paperSize:9, orientation:opt.portrait?"portrait":"landscape", fitToPage:true, fitToWidth:1, fitToHeight:0,
+      horizontalCentered:true, margins:{left:0.4, right:0.4, top:0.55, bottom:0.55, header:0.25, footer:0.25}}
+  });
+  ws.headerFooter.oddFooter="&Cصفحة &P من &N&Rوزارة الأشغال العامة — سجل صيانة الأجهزة";
+  return ws;
+}
+/* شريط العنوان أعلى الورقة */
+function xlTitle(ws, title, sub, span){
+  span=Math.max(2, span);
+  ws.mergeCells(1,1,1,span);
+  const t=ws.getCell(1,1);
+  t.value=title;
+  t.font={name:XL.font, size:16, bold:true, color:{argb:XL.white}};
+  t.fill=xlFill(XL.teal);
+  t.alignment={horizontal:"right", vertical:"middle", indent:1, readingOrder:"rtl"};
+  ws.getRow(1).height=34;
+  ws.mergeCells(2,1,2,span);
+  const s=ws.getCell(2,1);
+  s.value=sub||"";
+  s.font={name:XL.font, size:10.5, color:{argb:XL.tealDark}};
+  s.fill=xlFill(XL.tealSoft);
+  s.alignment={horizontal:"right", vertical:"middle", indent:1, readingOrder:"rtl"};
+  ws.getRow(2).height=22;
+  return 4;
+}
+/* عنوان قسم داخل الورقة */
+function xlSection(ws, row, text, span){
+  ws.mergeCells(row,1,row,Math.max(2,span));
+  const c=ws.getCell(row,1);
+  c.value=text;
+  c.font={name:XL.font, size:12, bold:true, color:{argb:XL.tealDark}};
+  c.alignment={horizontal:"right", vertical:"middle", readingOrder:"rtl"};
+  c.border={bottom:{style:"medium", color:{argb:XL.teal}}};
+  ws.getRow(row).height=24;
+  return row+1;
+}
+/* جدول منسّق: رأس ملوّن، صفوف متناوبة، أعمدة أرقام، حالة ملوّنة، وصف إجمالي اختياري */
+function xlTable(ws, row, spec){
+  const cols=spec.columns, rows=spec.rows||[];
+  const hr=ws.getRow(row);
+  cols.forEach((c,i)=>{
+    const cell=hr.getCell(i+1);
+    cell.value=c.h;
+    cell.font={name:XL.font, size:10.5, bold:true, color:{argb:XL.white}};
+    cell.fill=xlFill(XL.tealDark);
+    cell.alignment={horizontal:"center", vertical:"middle", wrapText:true, readingOrder:"rtl"};
+    cell.border=xlBorder(XL.tealDark);
+  });
+  hr.height=28;
+  const first=row+1;
+  if(!rows.length){
+    ws.mergeCells(first,1,first,cols.length);
+    const c=ws.getCell(first,1);
+    c.value="لا توجد بيانات";
+    c.font={name:XL.font, size:10.5, italic:true, color:{argb:XL.ink3}};
+    c.alignment={horizontal:"center", vertical:"middle"};
+    c.border=xlBorder();
+    return {next:first+2, first:first, last:first, header:row};
+  }
+  rows.forEach((r,ri)=>{
+    const R=ws.getRow(first+ri);
+    cols.forEach((c,i)=>{
+      const cell=R.getCell(i+1);
+      let v=r[i];
+      if(c.num || c.money || c.pct) v=(v===""||v==null)?null:Number(v)||0;
+      else v=(v==null||v==="")?"":String(v);
+      cell.value=v;
+      cell.font={name:XL.font, size:10.5, color:{argb:XL.ink}, bold:!!c.bold};
+      cell.border=xlBorder();
+      if(ri%2===1) cell.fill=xlFill(XL.zebra);
+      if(c.num)   cell.numFmt="#,##0";
+      if(c.money) cell.numFmt="#,##0.000";
+      if(c.pct)   cell.numFmt="0%";
+      cell.alignment={horizontal:(c.num||c.money||c.pct||c.center)?"center":"right",
+        vertical:"middle", wrapText:!!c.wrap, readingOrder:"rtl"};
+      if(c.status && v){
+        const tn=xlStatusTone(v);
+        cell.fill=xlFill(tn.fill);
+        cell.font={name:XL.font, size:10.5, bold:true, color:{argb:tn.font}};
+        cell.alignment={horizontal:"center", vertical:"middle"};
+      }
+      if(c.tone){
+        const tn=c.tone(r);
+        if(tn){ cell.fill=xlFill(tn.fill); cell.font={name:XL.font, size:10.5, bold:true, color:{argb:tn.font}}; }
+      }
+    });
+    R.height=20;
+  });
+  const last=first+rows.length-1;
+  let next=last+1;
+  if(spec.totals){
+    const T=ws.getRow(next);
+    cols.forEach((c,i)=>{
+      const cell=T.getCell(i+1);
+      if(i===0) cell.value=spec.totalsLabel||"الإجمالي";
+      else if(c.sum){
+        const L=ws.getColumn(i+1).letter;
+        cell.value={formula:"SUM("+L+first+":"+L+last+")"};
+        cell.numFmt=c.money?"#,##0.000":"#,##0";
+      }
+      cell.font={name:XL.font, size:10.5, bold:true, color:{argb:XL.tealDark}};
+      cell.fill=xlFill(XL.tealSoft);
+      cell.border={top:{style:"medium", color:{argb:XL.teal}}, bottom:{style:"thin", color:{argb:XL.lineDark}},
+        left:{style:"thin", color:{argb:XL.line}}, right:{style:"thin", color:{argb:XL.line}}};
+      cell.alignment={horizontal:i===0?"right":"center", vertical:"middle"};
+    });
+    T.height=22;
+    next++;
+  }
+  if(spec.bars){
+    spec.bars.forEach(ci=>{
+      const L=ws.getColumn(ci+1).letter;
+      try{
+        ws.addConditionalFormatting({ref:L+first+":"+L+last, rules:[{type:"dataBar", minLength:0, maxLength:100,
+          cfvo:[{type:"num", value:0},{type:"max"}], color:{argb:"FF4DB6AC"}, gradient:false}]});
+      }catch(e){}
+    });
+  }
+  return {next:next+1, first:first, last:last, header:row};
+}
+/* ورقة جدول واحد كاملة: عنوان، جدول، تجميد الرأس، وتصفية */
+function xlSheetTable(wb, spec){
+  const ws=xlNewSheet(wb, spec.name, spec);
+  const start=xlTitle(ws, spec.title, spec.sub, spec.columns.length);
+  const res=xlTable(ws, start, spec);
+  spec.columns.forEach((c,i)=>{ ws.getColumn(i+1).width=xlWidth(c, spec.rows||[], i); });
+  ws.views=[{rightToLeft:true, showGridLines:false, state:"frozen", ySplit:start, xSplit:spec.freezeCols||0, activeCell:"A"+(start+1)}];
+  if((spec.rows||[]).length) ws.autoFilter={from:{row:start, column:1}, to:{row:res.last, column:spec.columns.length}};
+  ws.pageSetup.printTitlesRow=start+":"+start;
+  return ws;
+}
+function xlSub(extra){
+  return ["وزارة الأشغال العامة · إدارة نظم المعلومات", SITES[1], extra, "تاريخ الإصدار: "+today()].filter(Boolean).join("   ·   ");
+}
+async function xlSave(wb, filename){
+  const buf=await wb.xlsx.writeBuffer();
+  await download(filename, new Blob([buf], {type:"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"}),
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+}
+/* يشغّل التصدير مع رسالة انتظار ورسالة خطأ واضحة */
+async function xlRun(label, build){
+  toast("جارٍ تجهيز ملف Excel…");
+  let ExcelJS;
+  try{ ExcelJS=await xlsxLib(); }
+  catch(e){ toast("تعذّر تحميل أداة Excel — تحقّق من الاتصال بالإنترنت"); return; }
+  try{
+    const wb=new ExcelJS.Workbook();
+    wb.creator="سجل صيانة الأجهزة — "+Access.label();
+    wb.created=new Date();
+    wb.views=[{rightToLeft:true}];
+    const filename=await build(wb);
+    await xlSave(wb, filename);
+  }catch(e){ console.error(e); toast("تعذّر إنشاء ملف "+label); }
+}
+
+/* ---------- أعمدة مشتركة ---------- */
+const XL_REC_COLS=[
+  {h:"رقم السجل", bold:true, w:17}, {h:"التاريخ", center:true, w:12}, {h:"اسم الموظف"}, {h:"القطاع"}, {h:"القسم"},
+  {h:"الطابق", center:true, w:9}, {h:"موقع العمل"}, {h:"نوع الجهاز"}, {h:"الموديل"}, {h:"رقم السيريال"}, {h:"رقم التاغ"},
+  {h:"الفني"}, {h:"نوع الصيانة"}, {h:"الحالة", status:true, w:14}, {h:"قطع الغيار", wrap:true, w:30},
+  {h:"إحداثيات GPS", w:22}, {h:"ملاحظات", wrap:true, w:40}
+];
+function xlRecRow(r){
+  return [r.no||"", r.date||"", r.employee||"", r.sector||"", r.dept||"", r.floor||"", r.locName||"",
+    r.devType||"", r.devModel||"", r.serial||"", r.tag||"", r.tech||"", r.mtype||"", r.status||"",
+    (r.parts||[]).map(p=>p.name+" ×"+p.qty).join("، "),
+    (r.gps&&isFinite(r.gps.lat)) ? fmtCoord(r.gps.lat)+", "+fmtCoord(r.gps.lng) : "",
+    r.notes||""];
+}
+/* ورقة ملخص: مؤشرات ثم جداول توزيع مع أشرطة بيانات */
+function xlSummarySheet(wb, name, title, sub, recs, extraKpis){
+  const ws=xlNewSheet(wb, name, {portrait:true});
+  let row=xlTitle(ws, title, sub, 4);
+  const done=recs.filter(r=>r.status==="منجز").length;
+  const kpis=[
+    ["إجمالي الأوامر", recs.length],
+    ["منجزة", done],
+    ["قيد التنفيذ / مفتوحة", recs.filter(r=>r.status==="مفتوح"||r.status==="قيد التنفيذ").length],
+    ["بانتظار قطعة غيار", recs.filter(r=>r.status==="بانتظار قطعة").length],
+    ["أجهزة مشمولة", new Set(recs.map(r=>(r.serial||"").trim()).filter(Boolean)).size],
+    ["قطع غيار مصروفة", recs.reduce((s,r)=>s+(r.parts||[]).reduce((x,p)=>x+n(p.qty),0),0)]
+  ].concat(extraKpis||[]);
+  row=xlSection(ws, row, "المؤشرات الرئيسية", 4);
+  row=xlTable(ws, row, {columns:[{h:"المؤشر", bold:true},{h:"القيمة", num:true}], rows:kpis}).next;
+  const pr=ws.getRow(row-1);
+  const pcl=ws.getCell(row-1,1), pcv=ws.getCell(row-1,2);
+  pcl.value="نسبة الإنجاز"; pcv.value=recs.length?done/recs.length:0; pcv.numFmt="0%";
+  [pcl,pcv].forEach((c,i)=>{ c.font={name:XL.font, size:11, bold:true, color:{argb:XL.white}}; c.fill=xlFill(XL.teal);
+    c.alignment={horizontal:i?"center":"right", vertical:"middle", indent:i?0:1}; c.border=xlBorder(XL.teal); });
+  pr.height=24;
+  row+=1;
+  const total=recs.length||1;
+  [["حسب نوع الصيانة","mtype"],["حسب القسم","dept"],["حسب الفني","tech"],["حسب نوع الجهاز","devType"],["حسب الطابق","floor"]].forEach(([t,key])=>{
+    const items=countBy(recs,key,10);
+    row=xlSection(ws, row, t, 4);
+    row=xlTable(ws, row, {columns:[{h:t.replace("حسب ",""), bold:true},{h:"عدد الأوامر", num:true, sum:true},{h:"النسبة", pct:true}],
+      rows:items.map(x=>[x.label, x.value, x.value/total]), totals:items.length>1, bars:[1]}).next;
+  });
+  ws.getColumn(1).width=34; ws.getColumn(2).width=16; ws.getColumn(3).width=12; ws.getColumn(4).width=4;
+  return ws;
+}
+
+/* تاريخ ووقت محليان من طابع ISO */
+function xlDT(ts){
+  const d=new Date(ts); if(isNaN(d)) return [String(ts||"").slice(0,10),""];
+  const p=v=>String(v).padStart(2,"0");
+  return [d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate()), p(d.getHours())+":"+p(d.getMinutes())];
+}
+function xlPartsSheet(wb, parts){
+  const st=p=>n(p.qty)<=0?"نفد":(n(p.qty)<=n(p.minQty)?"تحت الحد":"سليم");
+  const rows=parts.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name),"ar"))
+    .map(p=>[p.name||"", p.code||"", p.category||"", p.store||"", n(p.qty), n(p.minQty), p.unit||"حبة", n(p.price), n(p.qty)*n(p.price), st(p)]);
+  return xlSheetTable(wb,{name:"الأصناف", title:"مخزن قطع الغيار — الأصناف", sub:xlSub(fmt(rows.length)+" صنف"), freezeCols:1,
+    columns:[{h:"الصنف",bold:true},{h:"الرمز",center:true},{h:"الفئة"},{h:"المخزن / الرف"},
+      {h:"المتوفر",num:true,sum:true,w:11},{h:"الحد الأدنى",num:true,w:11},{h:"الوحدة",center:true,w:9},
+      {h:"سعر الوحدة (د.ك)",money:true,w:15},{h:"القيمة (د.ك)",money:true,sum:true,w:15},
+      {h:"حالة المخزون",center:true,w:14,tone:r=>r[9]==="نفد"?XL.tone.crit:(r[9]==="تحت الحد"?XL.tone.warn:XL.tone.ok)}],
+    rows:rows, totals:rows.length>0});
+}
+function xlMovesSheet(wb, mv){
+  return xlSheetTable(wb,{name:"حركات المخزن", title:"حركات المخزن", sub:xlSub(fmt(mv.length)+" حركة"), tab:"FFC05A0C",
+    columns:[{h:"التاريخ",center:true,w:12},{h:"الوقت",center:true,w:8},
+      {h:"الحركة",center:true,w:10,tone:r=>r[2]==="صرف"?XL.tone.warn:(r[2]==="إدخال"?XL.tone.ok:XL.tone.none)},
+      {h:"الصنف",bold:true},{h:"الرمز",center:true},{h:"الكمية",num:true,w:10},{h:"الفني / المستلم"},
+      {h:"رقم الأمر",center:true,w:16},{h:"ملاحظة",wrap:true,w:36}],
+    rows:mv.map(m=>{ const dt=xlDT(m.ts); return [dt[0], dt[1], m.type||"", m.partName||"", m.code||"", n(m.qty), m.tech||"", m.recordNo||"", m.note||""]; })});
+}
+function xlRecordsSheet(wb, name, title, recs){
+  const rows=recs.slice().sort((a,b)=>String(a.date+(a.no||"")).localeCompare(String(b.date+(b.no||""))));
+  return xlSheetTable(wb,{name:name, title:title, sub:xlSub(fmt(rows.length)+" أمر"), columns:XL_REC_COLS, rows:rows.map(xlRecRow), freezeCols:1});
 }
 
 /* ============================================================
@@ -1369,16 +1675,16 @@ const ICONS = {
   settings:'<path d="M12 15a3 3 0 100-6 3 3 0 000 6M19.4 15a1.6 1.6 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.6 1.6 0 00-2.7 1.1V21a2 2 0 11-4 0v-.1A1.6 1.6 0 007.5 19l-.1.1a2 2 0 11-2.8-2.8l.1-.1A1.6 1.6 0 003 13.6H3a2 2 0 110-4h.1A1.6 1.6 0 004.6 7l-.1-.1a2 2 0 112.8-2.8l.1.1a1.6 1.6 0 001.8.3H9a1.6 1.6 0 001-1.5V3a2 2 0 114 0v.1a1.6 1.6 0 002.7 1.1l.1-.1a2 2 0 112.8 2.8l-.1.1a1.6 1.6 0 00-.3 1.8V9a1.6 1.6 0 001.5 1H21a2 2 0 110 4h-.1a1.6 1.6 0 00-1.5 1z"/>'
 };
 const VIEWS = [
-  {k:"chief",       t:"لوحة رئيس القسم", only:"chief"},
+  {k:"chief",       t:"لوحة رئيس الفريق", only:"chief"},
   {k:"dashboard",   t:"لوحة المتابعة"},
   {k:"neworder",    t:"أمر صيانة جديد"},
   {k:"records",     t:"سجل الصيانة"},
   {k:"warehouse",   t:"مخزن قطع الغيار"},
   {k:"technicians", t:"الفنيون وسجلاتهم"},
   {k:"reports",     t:"التقارير الشهرية"},
-  {k:"settings",    t:"الإعدادات"},
-  {k:"places",      t:"بدل الموقع"},
-  {k:"supervisor",  t:"مشرف الفريق", only:"admin"}
+  {k:"settings",    t:"الإعدادات", only:"chief"},
+  {k:"places",      t:"بدل الموقع", only:"chief"},
+  {k:"supervisor",  t:"إدارة المركز", only:"admin"}
 ];
 
 const App = {
@@ -1730,9 +2036,7 @@ function viewDashboard(){
     tile("مفتوحة / قيد التنفيذ", fmt(open.length), open.length?"بحاجة إلى متابعة":"لا يوجد معلّق", open.length?"warn":"")+
     tile("بانتظار قطعة غيار", fmt(waiting.length), waiting.length?"موقوفة على المخزن":"لا يوجد", waiting.length?"crit":"")+
     tile("منجزة هذا الشهر", fmt(doneM.length), thisM.length?Math.round(doneM.length/thisM.length*100)+"% من أوامر الشهر":"—")+
-    tile("بانتظار اعتماد رئيس القسم", fmt(awaiting.length),
-      doneAll.length ? (awaiting.length ? "من أصل "+fmt(doneAll.length)+" أمر منجز" : "كل المنجزة معتمدة") : "لا توجد أوامر منجزة",
-      awaiting.length ? "warn" : (doneAll.length?"ok":""))+
+
     tile("أجهزة مسجّلة", fmt(devices), "حسب رقم السيريال")+
     tile("أصناف تحت الحد الأدنى", fmt(low.length), low.length?"راجع المخزن":"المخزون سليم", low.length?"crit":"ok")+
    '</div>';
@@ -1769,13 +2073,6 @@ function viewDashboard(){
       sub:"كل الفترات",
       chart:hbars(byTech),
       table:simpleTable(["الفني","العدد"], byTech.map(x=>[x.label,fmt(x.value)]))
-    })+
-    chartCard({
-      title:"الأوامر حسب رئيس القسم",
-      sub:"كل الفترات · "+(awaiting.length?fmt(awaiting.length)+" أمر بانتظار الاعتماد":"كل المنجزة معتمدة"),
-      chart: byChief.length ? hbars(byChief)
-        : '<div class="empty" style="padding:24px">لم يُسجَّل رئيس قسم في الأوامر بعد</div>',
-      table:simpleTable(["رئيس القسم","العدد"], byChief.map(x=>[x.label,fmt(x.value)]))
     })+
    '</div>';
 
@@ -1875,7 +2172,7 @@ function viewRecords(){
       '<div class="eyebrow">'+esc(App.site==="الكل"?"جميع المواقع":App.site)+'</div>'+
       '<h2>سجل الصيانة</h2><p>كل أوامر الصيانة المسجّلة. اضغط على أي صف لعرض التفاصيل والصورة.</p>'+
     '</div><div class="sp">'+
-      '<button class="btn" id="expRecs"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>تصدير CSV</button>'+
+      '<button class="btn" id="expRecs"><svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9zM14 3v6h6M9 12l5 6M14 12l-5 6"/></svg>تصدير Excel</button>'+
       '<button class="btn pri" data-go="neworder"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>أمر جديد</button>'+
     '</div></div>'+
     '<div class="filters">'+
@@ -1902,12 +2199,11 @@ function viewRecords(){
       bind("fsector","sector"); bind("fdept","dept"); bind("ffloor","floor"); bind("fdev","devType");
       bind("fmtype","mtype"); bind("ftech","tech"); bind("fstatus","status"); bind("ffrom","from"); bind("fto","to");
       $("#fclear",root).onclick=()=>{ App.filters={q:"",sector:"",dept:"",floor:"",devType:"",mtype:"",status:"",tech:"",chief:"",from:"",to:""}; render(); };
-      $("#expRecs",root).onclick=()=>{
-        const head=["رقم السجل","التاريخ","الموقع","اسم الموظف","القطاع","القسم","الطابق","موقع العمل","إحداثيات GPS","نوع الجهاز","الموديل","رقم السيريال","رقم التاغ","الفني","رئيس القسم","نوع الصيانة","الحالة","الاعتماد","قطع الغيار","ملاحظات"];
-        const data=rows.map(r=>[r.no,r.date,r.site,r.employee,r.sector,r.dept,r.floor,r.locName||"",(r.gps&&isFinite(r.gps.lat)?fmtCoord(r.gps.lat)+", "+fmtCoord(r.gps.lng):""),r.devType,r.devModel,r.serial,r.tag,r.tech,r.chief,r.mtype,r.status,(r.approvedAt?"معتمد — "+(r.approvedBy||"")+" "+String(r.approvedAt).slice(0,10):"غير معتمد"),
-          (r.parts||[]).map(p=>p.name+" ×"+p.qty).join(" | "), r.notes]);
-        download("سجل-الصيانة-"+today()+".csv", toCSV(head,data), "text/csv");
-      };
+      $("#expRecs",root).onclick=()=>xlRun("سجل الصيانة", async wb=>{
+        xlRecordsSheet(wb, "سجل الصيانة", "سجل صيانة الأجهزة", rows);
+        xlSummarySheet(wb, "ملخص", "ملخص سجل الصيانة", xlSub(fmt(rows.length)+" أمر حسب التصفية الحالية"), rows);
+        return "سجل-الصيانة-"+today()+".xlsx";
+      });
     }
   };
 }
@@ -1939,11 +2235,8 @@ async function openRecord(id){
         '</dl>'+
         '<div class="sub-head">التنفيذ</div>'+
         '<dl class="kv">'+
-          kv("الفني المسؤول",r.tech)+kv("رئيس القسم",r.chief)+kv("نوع الصيانة",r.mtype)+
+          kv("الفني المسؤول",r.tech)+kv("نوع الصيانة",r.mtype)+
           kv("قطع الغيار", parts.length? parts.map(p=>esc(p.name)+" ×"+fmt(p.qty)).join("، ") : "لا يوجد", true)+
-          kv("الاعتماد", r.approvedAt
-              ? '<span class="badge-ok">✓ معتمد</span> — '+esc(r.approvedBy||"")+' <span class="mono" style="color:var(--ink-3)">'+esc(String(r.approvedAt).slice(0,10))+'</span>'
-              : '<span style="color:var(--ink-3)">غير معتمد</span>', true)+
         '</dl>'+
         (r.notes?'<div class="sub-head">ملاحظات</div><p style="margin:0;white-space:pre-wrap;color:var(--ink-2)">'+esc(r.notes)+'</p>':'')+
       '</div>'+
@@ -2009,7 +2302,7 @@ function viewNewOrder(){
 
     '<fieldset class="fieldset"><legend>الموقع والتاريخ</legend><div class="grid-f">'+
       '<div class="field"><label for="fSite">الموقع (مطلوب)</label><select class="inp" id="fSite" required>'+optionsHTML(allowedSites(),site)+'</select>'+
-        '<span class="hint">فصل تام بين المبنى الرئيسي والمركز الحكومي في السجلات والمخزن والتقارير.</span></div>'+
+        '<span class="hint">كل أوامر الصيانة تُسجَّل للمركز الحكومي.</span></div>'+
       '<div class="field"><label for="fDate">تاريخ الصيانة (مطلوب)</label><input class="inp" type="date" id="fDate" required value="'+esc(rec?rec.date:today())+'"></div>'+
       '<div class="field"><label for="fFloor">الطابق</label><select class="inp" id="fFloor">'+optionsHTML(c.floors[site]||[], rec?rec.floor:"", "اختر الطابق")+'</select></div>'+
       locPickerHTML(rec)+
@@ -2200,9 +2493,9 @@ function viewWarehouse(){
     html:
     '<div class="page-head"><div>'+
       '<div class="eyebrow">'+esc(App.site==="الكل"?"جميع المواقع":App.site)+'</div>'+
-      '<h2>مخزن قطع الغيار</h2><p>لكل موقع مخزونه المستقل. الصرف على أوامر الصيانة يخصم من هذا الرصيد ويُسجَّل في الحركات.'+(canManageAny()?'':' إضافة الأصناف وتعديلها من صلاحية مشرف الفريق للمركز الحكومي، وموظفي المبنى الرئيسي لمبناهم.')+'</p>'+
+      '<h2>مخزن قطع الغيار</h2><p>لكل موقع مخزونه المستقل. الصرف على أوامر الصيانة يخصم من هذا الرصيد ويُسجَّل في الحركات.'+(canManageAny()?'':' إضافة الأصناف وتعديلها والإدخال والصرف اليدوي من صلاحية رئيس الفريق — والصرف على أوامر الصيانة يتم تلقائياً.')+'</p>'+
     '</div><div class="sp">'+
-      '<button class="btn" id="expParts"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>تصدير CSV</button>'+
+      '<button class="btn" id="expParts"><svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9zM14 3v6h6M9 12l5 6M14 12l-5 6"/></svg>تصدير Excel</button>'+
       (canManageAny()?'<button class="btn pri" id="addPartBtn"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>صنف جديد</button>':'')+
     '</div></div>'+
     '<div class="tiles">'+
@@ -2228,8 +2521,8 @@ function viewWarehouse(){
             '<td class="r num'+(q<=0?" qty-neg":(low?" qty-low":""))+'" style="font-weight:700">'+fmt(q)+'</td>'+
             '<td class="r num">'+fmt(p.minQty)+'</td><td>'+esc(p.unit||"حبة")+'</td>'+
             '<td class="r" style="white-space:nowrap">'+
-              '<button class="btn sm" data-mov-in="'+esc(p.id)+'">إدخال</button> '+
-              '<button class="btn sm" data-mov-out="'+esc(p.id)+'">صرف</button> '+
+              (canManage(p.site)?'<button class="btn sm" data-mov-in="'+esc(p.id)+'">إدخال</button> '+
+              '<button class="btn sm" data-mov-out="'+esc(p.id)+'">صرف</button> ':'')+
               (canManage(p.site)?'<button class="btn sm ghost" data-edit-part="'+esc(p.id)+'">تعديل</button>':'')+
             '</td></tr>';
         }).join("")+'</tbody></table></div>'
@@ -2253,11 +2546,11 @@ function viewWarehouse(){
       $$("[data-edit-part]",root).forEach(b=>b.onclick=()=>partForm(byId(Store.list("parts"),b.dataset.editPart)));
       $$("[data-mov-in]",root).forEach(b=>b.onclick=()=>movForm(byId(Store.list("parts"),b.dataset.movIn),"إدخال"));
       $$("[data-mov-out]",root).forEach(b=>b.onclick=()=>movForm(byId(Store.list("parts"),b.dataset.movOut),"صرف"));
-      $("#expParts",root).onclick=()=>{
-        download("المخزن-"+today()+".csv",
-          toCSV(["الصنف","الرمز","الفئة","الموقع","المخزن","المتوفر","الحد الأدنى","الوحدة","سعر الوحدة"],
-            parts.map(p=>[p.name,p.code,p.category,p.site,p.store,p.qty,p.minQty,p.unit,p.price])),"text/csv");
-      };
+      $("#expParts",root).onclick=()=>xlRun("المخزن", async wb=>{
+        xlPartsSheet(wb, parts);
+        xlMovesSheet(wb, siteFilter(Store.list("movements")));
+        return "مخزن-قطع-الغيار-"+today()+".xlsx";
+      });
     }
   };
 }
@@ -2298,6 +2591,7 @@ function partForm(p){
 }
 function movForm(p,type){
   if(!p) return;
+  if(!canManage(p.site)){ toast("الإدخال والصرف اليدوي في المخزن من صلاحية رئيس الفريق"); return; }
   const techs=Store.list("technicians").map(t=>t.name);
   openModal({
     title:(type==="إدخال"?"إدخال إلى المخزن":"صرف من المخزن")+" — "+p.name,
@@ -2348,7 +2642,7 @@ function viewTechnicians(){
     '<div class="page-head"><div>'+
       '<div class="eyebrow">'+esc(App.site==="الكل"?"جميع المواقع":App.site)+'</div>'+
       '<h2>الفنيون وسجلاتهم</h2><p>لكل فني سجل يجمع أوامره وقطع الغيار التي صرفها وتوزيع عمله عبر الأشهر.</p>'+
-    '</div><div class="sp"><button class="btn pri" id="addTech"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>إضافة فني</button></div></div>'+
+    '</div><div class="sp">'+(canManageAny()?'<button class="btn pri" id="addTech"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>إضافة فني</button>':'')+'</div></div>'+
     '<section class="card"><div class="card-h"><h3>الفنيون</h3><span class="chip">'+fmt(list.length)+'</span></div><div class="card-b">'+
       (list.length? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>الفني</th><th>التخصص</th><th>الموقع</th><th>الهاتف</th>'+
         '<th class="r">إجمالي الأوامر</th><th class="r">هذا الشهر</th><th class="r">قيد العمل</th><th></th></tr></thead><tbody>'+
@@ -2360,23 +2654,24 @@ function viewTechnicians(){
             '<td class="mono">'+esc(t.phone||"—")+'</td>'+
             '<td class="r num">'+fmt(s.total)+'</td><td class="r num">'+fmt(s.month)+'</td>'+
             '<td class="r num'+(s.openC?" qty-low":"")+'">'+fmt(s.openC)+'</td>'+
-            '<td class="r"><button class="btn sm ghost" data-edit-tech="'+esc(t.id)+'">تعديل</button></td></tr>';
+            '<td class="r">'+(canManageAny()?'<button class="btn sm ghost" data-edit-tech="'+esc(t.id)+'">تعديل</button>':'')+'</td></tr>';
         }).join("")+'</tbody></table></div>'
       : '<div class="empty"><svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2M9 7a3 3 0 106 0 3 3 0 10-6 0"/></svg>لم يُسجَّل فنيون بعد</div>')+
     '</div></section>'+
     (ghosts.length? '<section class="card" style="margin-top:14px"><div class="card-h"><h3>أسماء وردت في السجلات وغير مضافة</h3></div>'+
       '<div class="card-b"><div class="tag-list">'+ghosts.map(nm=>'<span class="tag" style="cursor:pointer" data-tech="'+esc(nm)+'">'+esc(nm)+' · '+fmt(techStats(nm).total)+'</span>').join("")+
-      '</div><p class="card-sub" style="padding:10px 0 0">أضِفهم من زر «إضافة فني» لتوحيد السجلات.</p></div></section>':'')+
+      '</div><p class="card-sub" style="padding:10px 0 0">يضيفهم رئيس الفريق من زر «إضافة فني» لتوحيد السجلات.</p></div></section>':'')+
     techMapCard(),
     mount(root){
       mountTechMap(root);
-      $("#addTech",root).onclick=()=>techForm(null);
+      const at=$("#addTech",root); if(at) at.onclick=()=>techForm(null);
       $$("[data-edit-tech]",root).forEach(b=>b.onclick=e=>{ e.stopPropagation(); techForm(byId(Store.list("technicians"),b.dataset.editTech)); });
       $$("[data-tech]",root).forEach(el=>el.onclick=()=>openTechLog(el.dataset.tech));
     }
   };
 }
 function techForm(t){
+  if(!canManageAny()){ toast("إضافة الفنيين وتعديلهم من صلاحية رئيس الفريق"); return; }
   openModal({
     title:t?"تعديل بيانات الفني":"إضافة فني",
     body:'<div class="grid-f">'+
@@ -2430,11 +2725,11 @@ function openTechLog(name){
       '<div class="map-wrap">'+geoMap(techPoints(s.all),{h:250, empty:"لا توجد مواقع أو نقاط GPS لهذا الفني"})+'</div>'+
       '<div class="sub-head">آخر الأوامر</div>'+recordsTable(recent),
     actions:[
-      {label:"تصدير سجل الفني", cls:"btn", act:()=>{
-        download("سجل-"+name+"-"+today()+".csv",
-          toCSV(["رقم السجل","التاريخ","الموقع","الجهاز","السيريال","الموظف","القسم","موقع العمل","رئيس القسم","نوع الصيانة","الحالة","قطع الغيار","ملاحظات"],
-            s.all.map(r=>[r.no,r.date,r.site,r.devType,r.serial,r.employee,r.dept,r.locName||"",r.chief,r.mtype,r.status,(r.parts||[]).map(p=>p.name+" ×"+p.qty).join(" | "),r.notes])),"text/csv");
-      }},
+      {label:"تصدير سجل الفني (Excel)", cls:"btn", act:()=>xlRun("سجل الفني", async wb=>{
+        xlRecordsSheet(wb, "أوامر الفني", "سجل الفني — "+name, s.all);
+        xlSummarySheet(wb, "ملخص", "ملخص أعمال الفني — "+name, xlSub(fmt(s.all.length)+" أمر"), s.all);
+        return "سجل-"+name+"-"+today()+".xlsx";
+      })},
       {label:"إغلاق", cls:"btn pri", act:closeModal}
     ],
     onMount(root){ mountCharts(root); mountRecordRows(root); }
@@ -2499,7 +2794,7 @@ function reportText(ym){
     m.bySite.forEach(b=>L.push("- "+b.site+": "+fmt(b.total)+" أمر، منجزة "+fmt(b.done)+" ("+b.pct+"%)"));
   }
   L.push("");
-  L.push("رئيس القسم: "+Access.chiefName());
+  L.push("رئيس الفريق: "+Access.chiefName());
   return L.join("\n");
 }
 function monthEndNotice(){
@@ -2511,7 +2806,7 @@ function monthEndNotice(){
     return '<div class="notice warn"><b>تقرير '+esc(monthLabel(p))+' لم يُرسل بعد</b> — يُرسل تلقائياً خلال لحظات إن وُجدت أوامر في ذلك الشهر.'+
       '<button class="btn sm" data-goto-rep="'+p+'">فتح التقرير</button></div>';
   if(monthEndNear() && unsentCur)
-    return '<div class="notice"><b>الشهر يوشك على الانتهاء</b> — سيُرتَّب تقرير '+esc(monthLabel(ymOf(today())))+' ويُرسل تلقائياً إلى رئيس القسم عند أول دخول بعد نهايته.'+
+    return '<div class="notice"><b>الشهر يوشك على الانتهاء</b> — سيُرتَّب تقرير '+esc(monthLabel(ymOf(today())))+' ويُرسل تلقائياً إلى رئيس الفريق عند أول دخول بعد نهايته.'+
       '<button class="btn sm" data-goto-rep="'+ymOf(today())+'">فتح التقرير</button></div>';
   return "";
 }
@@ -2555,7 +2850,7 @@ async function sendReport(ym,note,opt){
     sentBy: opt.auto ? "إرسال تلقائي — "+Access.label() : Access.label(),
     note:note||"", readAt:null, readBy:"", ackNote:""
   }));
-  if(!opt.silent){ toast("أُرسل تقرير "+monthLabel(ym)+" إلى رئيس القسم"); render(); }
+  if(!opt.silent){ toast("أُرسل تقرير "+monthLabel(ym)+" إلى رئيس الفريق"); render(); }
 }
 /* الإرسال التلقائي: عند أول دخول بعد نهاية الشهر تُرسل تقارير الأشهر المنتهية غير المرسلة */
 const AutoRep={done:{}, timer:null, running:false};
@@ -2585,7 +2880,7 @@ async function runAutoReports(){
     AutoRep.done[key]=true;
   }catch(e){ console.warn("auto-report", e); }
   finally{ App.site=keepSite; AutoRep.running=false; }
-  if(sent){ toast("أُرسل "+fmt(sent)+" تقرير شهري مرتّب تلقائياً إلى رئيس القسم"); render(); }
+  if(sent){ toast("أُرسل "+fmt(sent)+" تقرير شهري مرتّب تلقائياً إلى رئيس الفريق"); render(); }
 }
 
 function viewReports(){
@@ -2616,38 +2911,50 @@ function viewReports(){
   const partsArr=Object.keys(partsMap).map(k=>({label:k,value:partsMap[k]})).sort((a,b)=>b.value-a.value);
 
   const sent=reportDoc(ym);
+  const review=(sent && (sent.execSummary||sent.recommendations||sent.ackNote||sent.status)) ? sent : null;
+  const reviewHTML = review
+    ? '<dl class="kv">'+kv("حالة التقرير", repStatus(review))+
+        (review.editedBy?kv("راجعه", review.editedBy+" — "+String(review.editedAt||"").slice(0,10)):"")+'</dl>'+
+      (review.execSummary?'<div class="sub-head">الملخص التنفيذي</div><p class="rep-stmt" style="white-space:pre-wrap">'+esc(review.execSummary)+'</p>':'')+
+      (review.recommendations?'<div class="sub-head">التوصيات</div><p class="rep-stmt" style="white-space:pre-wrap">'+esc(review.recommendations)+'</p>':'')+
+      (review.ackNote?'<div class="sub-head">ملاحظات رئيس الفريق</div><p class="rep-stmt" style="white-space:pre-wrap">'+esc(review.ackNote)+'</p>':'')
+    : '';
   const sec=(i,title,body)=>'<div class="rep-sec"><h3><span class="ord">'+ORD[i]+'</span>'+esc(title)+'</h3>'+body+'</div>';
 
-  /* شريط الإرسال إلى رئيس القسم */
+  /* شريط الإرسال إلى رئيس الفريق */
   let sendBar;
   if(Access.isChief()){
-    sendBar='<div class="send-bar"><div><b>أنت رئيس القسم</b><div class="s">التقارير المرسلة تصلك في لوحتك الخاصة.</div></div>'+
-      '<div class="sp"><button class="btn" data-go="chief">فتح لوحتي ←</button></div></div>';
+    sendBar = sent
+      ? '<div class="send-bar"><div><b>تقرير '+esc(monthLabel(ym))+' — '+esc(repStatus(sent))+'</b>'+
+          '<div class="s">راجع التقرير وعدّل الملخص والتوصيات وترتيب الأقسام، ثم اعتمده أو أعده للتعديل.</div></div>'+
+          '<div class="sp"><button class="btn pri" data-editrep="'+esc(sent.id)+'">مراجعة وتعديل التقرير</button></div></div>'
+      : '<div class="send-bar warn"><div><b>لم يصل تقرير '+esc(monthLabel(ym))+' بعد</b>'+
+          '<div class="s">يُرسل تلقائياً عند أول دخول للمركز الحكومي بعد نهاية الشهر.</div></div></div>';
   }else if(!Access.hasChief()){
-    sendBar='<div class="send-bar warn"><div><b>لم تُضبط جهة رئيس القسم بعد</b>'+
-      '<div class="s">اضبط كلمة سر رئيس القسم من شاشة الدخول أو الإعدادات لتتمكن من إرسال التقارير إليه.</div></div></div>';
+    sendBar='<div class="send-bar warn"><div><b>لم تُضبط جهة رئيس الفريق بعد</b>'+
+      '<div class="s">اضبط كلمة سر رئيس الفريق من شاشة الدخول لتتمكن من إرسال التقارير إليه.</div></div></div>';
   }else if(sent){
-    sendBar='<div class="send-bar ok"><div><b>أُرسل إلى رئيس القسم</b>'+
+    sendBar='<div class="send-bar '+(repStatus(sent)==="مُعاد للتعديل"?"warn":"ok")+'"><div><b>'+(sent.status?"حالة التقرير عند رئيس الفريق: "+esc(repStatus(sent)):"أُرسل إلى رئيس الفريق")+'</b>'+
       '<div class="s">بتاريخ <span class="mono">'+esc(String(sent.sentAt).slice(0,10))+'</span> بواسطة '+esc(sent.sentBy||"")+
-      (sent.readAt?' · اطّلع عليه رئيس القسم بتاريخ <span class="mono">'+esc(String(sent.readAt).slice(0,10))+'</span>':' · لم يُفتح بعد')+'</div></div>'+
+      (sent.readAt?' · اطّلع عليه رئيس الفريق بتاريخ <span class="mono">'+esc(String(sent.readAt).slice(0,10))+'</span>':' · لم يُفتح بعد')+'</div></div>'+
       '<div class="sp"><button class="btn" id="sendRep">إعادة الإرسال بعد التحديث</button></div></div>';
   }else{
     sendBar='<div class="send-bar"><div><b>لم يُرسل تقرير '+esc(monthLabel(ym))+' بعد</b>'+
       '<div class="s">يُرتَّب ويُرسل تلقائياً عند أول دخول بعد نهاية الشهر، ويمكنك إرساله الآن يدوياً.</div></div>'+
       '<div class="sp"><button class="btn pri" id="sendRep">'+
-        '<svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg>إرسال إلى رئيس القسم</button></div></div>';
+        '<svg viewBox="0 0 24 24"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg>إرسال إلى رئيس الفريق</button></div></div>';
   }
 
   return {
     html:
     '<div class="page-head"><div>'+
       '<div class="eyebrow">تقرير دوري</div><h2>التقرير الشهري</h2>'+
-      '<p>وثيقة مرتّبة جاهزة للطباعة والاعتماد، تُرسل بنهاية الشهر إلى رئيس القسم.</p>'+
+      '<p>وثيقة مرتّبة جاهزة للطباعة والاعتماد، تُرسل بنهاية الشهر إلى رئيس الفريق.</p>'+
     '</div><div class="sp">'+
       '<div class="field"><label for="repM">الشهر</label><select class="inp" id="repM">'+
         months.map(m=>'<option value="'+m+'"'+(m===ym?" selected":"")+'>'+esc(monthLabel(m))+(reportDoc(m)?" ✓":"")+'</option>').join("")+'</select></div>'+
       '<button class="btn" id="printRep"><svg viewBox="0 0 24 24"><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5h20v5a2 2 0 01-2 2h-2M6 14h12v8H6z"/></svg>طباعة / PDF</button>'+
-      '<button class="btn" id="expRep"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>تصدير CSV</button>'+
+      '<button class="btn" id="expRep"><svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9zM14 3v6h6M9 12l5 6M14 12l-5 6"/></svg>تصدير Excel</button>'+
     '</div></div>'+
 
     '<div class="no-print">'+monthEndNotice()+sendBar+'</div>'+
@@ -2673,7 +2980,7 @@ function viewReports(){
             '<div class="mini"><div class="l">أجهزة مشمولة</div><div class="v">'+fmt(devices)+'</div></div>'+
             '<div class="mini"><div class="l">قطع غيار مصروفة</div><div class="v">'+fmt(partsUsed)+'</div></div>'+
             '<div class="mini"><div class="l">نسبة الإنجاز</div><div class="v">'+(scope.length?Math.round(done/scope.length*100):0)+'%</div></div>'+
-            '<div class="mini"><div class="l">معتمدة من رئيس القسم</div><div class="v">'+fmt(approved)+'</div></div>'+
+            
           '</div>')+
 
         sec(1, bySite.length>1?"مقارنة المواقع":"ملخص الموقع",
@@ -2715,11 +3022,7 @@ function viewReports(){
         sec(4,"تفصيل أوامر الشهر",
           recordsTable(scope.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date)))))+
 
-        sec(5,"الاعتماد والتوقيعات",
-          '<p class="rep-stmt">نشهد بأن البيانات الواردة في هذا التقرير مطابقة لسجلات الصيانة المعتمدة للفترة المذكورة أعلاه.</p>'+
-          '<div class="sig-row"><div class="sig">الفني المسؤول</div>'+
-            '<div class="sig">'+esc(Access.chiefName())+'</div>'+
-            '<div class="sig">مدير إدارة نظم المعلومات</div></div>')+
+        (review ? sec(5,"مراجعة رئيس الفريق", reviewHTML) : '')+
 
       '</div>'+
     '</section>',
@@ -2733,13 +3036,34 @@ function viewReports(){
         try{ window.print(); }
         catch(e){ toast("تعذّر فتح الطباعة — استخدم طباعة المتصفح (Ctrl+P)"); }
       };
+      $$("[data-editrep]",root).forEach(b=>b.onclick=()=>openReportDoc(b.dataset.editrep));
       const sb=$("#sendRep",root);
       if(sb) sb.onclick=()=>sendReportDialog(ym);
-      $("#expRep",root).onclick=()=>{
-        download("تقرير-"+ym+".csv",
-          toCSV(["رقم السجل","التاريخ","الموقع","اسم الموظف","القطاع","القسم","الطابق","موقع العمل","إحداثيات GPS","نوع الجهاز","الموديل","السيريال","التاغ","الفني","رئيس القسم","نوع الصيانة","الحالة","الاعتماد","قطع الغيار","ملاحظات"],
-            scope.map(r=>[r.no,r.date,r.site,r.employee,r.sector,r.dept,r.floor,r.locName||"",(r.gps&&isFinite(r.gps.lat)?fmtCoord(r.gps.lat)+", "+fmtCoord(r.gps.lng):""),r.devType,r.devModel,r.serial,r.tag,r.tech,r.chief,r.mtype,r.status,(r.approvedAt?"معتمد — "+(r.approvedBy||"")+" "+String(r.approvedAt).slice(0,10):"غير معتمد"),(r.parts||[]).map(p=>p.name+" ×"+p.qty).join(" | "),r.notes])),"text/csv");
-      };
+      $("#expRep",root).onclick=()=>xlRun("التقرير الشهري", async wb=>{
+        const doc=reportDoc(ym);
+        const ws=xlSummarySheet(wb, "ملخص التقرير", "تقرير صيانة الأجهزة — "+monthLabel(ym),
+          xlSub("رقم التقرير: "+reportNo(ym)+(doc&&doc.status?"   ·   حالة التقرير: "+doc.status:"")), scope);
+        if(doc && (doc.execSummary||doc.recommendations||doc.ackNote)){
+          let row=ws.lastRow.number+2;
+          [["الملخص التنفيذي",doc.execSummary],["التوصيات",doc.recommendations],["ملاحظات رئيس الفريق",doc.ackNote]].forEach(([t,v])=>{
+            if(!v) return;
+            row=xlSection(ws,row,t,3);
+            ws.mergeCells(row,1,row,3);
+            const c=ws.getCell(row,1);
+            c.value=v; c.font={name:XL.font, size:10.5, color:{argb:XL.ink}};
+            c.alignment={horizontal:"right", vertical:"top", wrapText:true, readingOrder:"rtl"};
+            ws.getRow(row).height=Math.min(160, 18*Math.max(2, Math.ceil(String(v).length/70)));
+            row+=2;
+          });
+        }
+        xlRecordsSheet(wb, "أوامر الشهر", "أوامر صيانة "+monthLabel(ym), scope);
+        const pm={};
+        scope.forEach(r=>(r.parts||[]).forEach(p=>{ pm[p.name]=(pm[p.name]||0)+n(p.qty); }));
+        const pr=Object.keys(pm).map(k=>[k,pm[k]]).sort((a,b)=>b[1]-a[1]);
+        xlSheetTable(wb,{name:"قطع الغيار", title:"قطع الغيار المصروفة — "+monthLabel(ym), sub:xlSub(fmt(pr.length)+" صنف"), tab:"FFC05A0C",
+          columns:[{h:"الصنف",bold:true,w:34},{h:"الكمية المصروفة",num:true,sum:true,w:18}], rows:pr, totals:pr.length>0, bars:[1]});
+        return "تقرير-الصيانة-"+ym+".xlsx";
+      });
     }
   };
 }
@@ -2748,16 +3072,16 @@ function sendReportDialog(ym){
   const m=reportSummary(ym);
   const prev=reportDoc(ym);
   openModal({
-    title:"إرسال تقرير "+monthLabel(ym)+" إلى رئيس القسم", size:"lg",
+    title:"إرسال تقرير "+monthLabel(ym)+" إلى رئيس الفريق", size:"lg",
     body:
-      '<p class="note" style="margin:0">يصل التقرير إلى لوحة رئيس القسم الخاصة («'+esc(Access.chiefName())+'»)، ويُسجَّل تاريخ الإرسال ومَن أرسله، وتاريخ اطّلاعه عليه.</p>'+
+      '<p class="note" style="margin:0">يصل التقرير إلى لوحة رئيس الفريق الخاصة («'+esc(Access.chiefName())+'»)، ويُسجَّل تاريخ الإرسال ومَن أرسله، وتاريخ اطّلاعه عليه.</p>'+
       '<div class="mini-cards" style="margin-top:14px">'+
         '<div class="mini"><div class="l">إجمالي الأوامر</div><div class="v">'+fmt(m.total)+'</div></div>'+
         '<div class="mini"><div class="l">منجزة</div><div class="v">'+fmt(m.done)+'</div></div>'+
         '<div class="mini"><div class="l">قيد التنفيذ</div><div class="v">'+fmt(m.pending)+'</div></div>'+
         '<div class="mini"><div class="l">نسبة الإنجاز</div><div class="v">'+m.pct+'%</div></div>'+
       '</div>'+
-      '<div class="field" style="margin-top:14px"><label for="repNote">ملاحظة لرئيس القسم (اختيارية)</label>'+
+      '<div class="field" style="margin-top:14px"><label for="repNote">ملاحظة لرئيس الفريق (اختيارية)</label>'+
         '<textarea class="inp" id="repNote" placeholder="أي ملاحظة ترافق التقرير…">'+esc(prev?prev.note:"")+'</textarea></div>'+
       '<div class="field" style="margin-top:12px"><label for="repTxt">نص التقرير (للنسخ إن رغبت)</label>'+
         '<textarea class="inp mono" id="repTxt" rows="9" readonly>'+esc(reportText(ym))+'</textarea></div>',
@@ -2769,7 +3093,7 @@ function sendReportDialog(ym){
         }else toast("حدّد النص وانسخه يدوياً");
       }},
       {label:"إلغاء", cls:"btn", act:closeModal},
-      {label:prev?"إعادة الإرسال":"إرسال إلى رئيس القسم", cls:"btn pri", act:async()=>{
+      {label:prev?"إعادة الإرسال":"إرسال إلى رئيس الفريق", cls:"btn pri", act:async()=>{
         const note=$("#repNote").value.trim();
         closeModal(); await sendReport(ym,note);
       }}
@@ -2778,8 +3102,204 @@ function sendReportDialog(ym){
 }
 
 /* ============================================================
-   15.5 لوحة رئيس القسم — خاصة به وحده
+   15.5 لوحة رئيس الفريق — متابعة التقارير وتعديلها فقط
    ============================================================ */
+const REPORT_STATUSES=["جديد","قيد المراجعة","معتمد","مُعاد للتعديل"];
+const REPORT_TONE={"جديد":"warn","قيد المراجعة":"","معتمد":"ok","مُعاد للتعديل":"crit"};
+function repStatus(r){ return r.status || (r.readAt ? "قيد المراجعة" : "جديد"); }
+function repStatusChip(r){ const s=repStatus(r); return '<span class="chip '+(REPORT_TONE[s]||"")+'"><i></i>'+esc(s)+'</span>'; }
+/* ملخص تنفيذي مقترح يُكتب تلقائياً من أرقام التقرير */
+function autoExecSummary(r){
+  return "خلال "+monthLabel(r.ym||"")+" سُجّل "+fmt(r.total)+" أمر صيانة في "+SITES[1]+
+    "، أُنجز منها "+fmt(r.done)+" ("+n(r.pct)+"%)، ولا يزال "+fmt(r.pending)+" قيد التنفيذ"+
+    (n(r.waiting)?"، منها "+fmt(r.waiting)+" بانتظار قطع غيار":"")+
+    ". شملت الصيانة "+fmt(r.devices)+" جهازاً، وصُرفت "+fmt(r.parts)+" قطعة غيار.";
+}
+function orderedSections(r){
+  const secs=((r.arranged&&r.arranged.sections)||[]).map(s=>Object.assign({},s));
+  const ord=r.sectionOrder||[];
+  if(ord.length) secs.sort((a,b)=>{ const ia=ord.indexOf(a.k), ib=ord.indexOf(b.k); return (ia<0?99:ia)-(ib<0?99:ib); });
+  return secs;
+}
+function sectionsHTML(r){
+  const hidden=r.hiddenSections||[];
+  const secs=orderedSections(r).filter(s=>hidden.indexOf(s.k)<0 && ((s.rows&&s.rows.length)||(s.list&&s.list.length)));
+  if(!secs.length) return '<div class="empty" style="padding:18px">لا توجد أقسام ظاهرة في هذا التقرير</div>';
+  return secs.map((sec,i)=>
+    '<div class="rep-sec" style="padding:12px 0"><h3><span class="ord">'+(ORD[i]||String(i+1))+'</span>'+esc(sec.t)+'</h3>'+
+    (sec.rows
+      ? simpleTable([sec.t,"العدد"], sec.rows.map(x=>[x.label, fmt(x.value)]))
+      : simpleTable(["رقم السجل","التاريخ","الجهاز","الفني","الحالة"], sec.list.map(o=>[o.no,o.date,o.dev,o.tech,o.status])))+
+    '</div>').join("");
+}
+
+function viewChief(){
+  const inbox=Store.list("reports").slice().sort((a,b)=>String(b.ym||"").localeCompare(String(a.ym||"")));
+  const count=s=>inbox.filter(r=>repStatus(r)===s).length;
+  return {
+    html:
+    '<div class="page-head"><div>'+
+      '<div class="eyebrow">'+esc(SITES[1])+'</div>'+
+      '<h2>لوحة رئيس الفريق</h2>'+
+      '<p>متابعة التقارير الشهرية الواردة من المركز الحكومي، ومراجعتها وتعديلها واعتمادها أو إعادتها للتعديل.</p>'+
+    '</div><div class="sp"><button class="btn" data-go="reports">التقرير الشهري ←</button></div></div>'+
+
+    '<div class="chief-band">'+
+      '<div><div class="t">'+esc(Access.chiefName())+'</div>'+
+        '<div class="s">هذا الاسم يظهر على كل مراجعة تحفظها وفي التقارير</div></div>'+
+      '<div class="sp">'+
+        '<div class="field"><label for="chiefNm">اسم رئيس الفريق</label><input class="inp" id="chiefNm" value="'+esc(Access.chiefName())+'"></div>'+
+        '<button class="btn" id="chiefNmSave">حفظ الاسم</button>'+
+      '</div>'+
+    '</div>'+
+
+    '<div class="tiles">'+
+      tile("تقارير واردة", fmt(inbox.length), "كل الأشهر", "accent")+
+      tile("جديدة", fmt(count("جديد")), count("جديد")?"بحاجة إلى مراجعة":"لا يوجد جديد", count("جديد")?"warn":"")+
+      tile("قيد المراجعة", fmt(count("قيد المراجعة")), "فُتحت ولم تُعتمد")+
+      tile("معتمدة", fmt(count("معتمد")), "اعتمدها رئيس الفريق", count("معتمد")?"ok":"")+
+      tile("مُعادة للتعديل", fmt(count("مُعاد للتعديل")), "بانتظار المركز الحكومي", count("مُعاد للتعديل")?"crit":"")+
+    '</div>'+
+
+    '<section class="card"><div class="card-h"><h3>التقارير الشهرية</h3>'+
+      '<span class="chip'+(count("جديد")?" warn":"")+'">'+fmt(count("جديد"))+' جديد</span></div>'+
+      '<div class="card-b" style="padding-top:8px">'+(inbox.length
+        ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>الشهر</th><th>رقم التقرير</th>'+
+          '<th class="r">الأوامر</th><th class="r">منجزة</th><th class="r">الإنجاز</th><th>أرسله</th><th>تاريخ الإرسال</th>'+
+          '<th>الحالة</th><th>آخر تعديل</th><th></th></tr></thead><tbody>'+
+          inbox.map(r=>'<tr class="'+(repStatus(r)==="جديد"?"unread":"")+'">'+
+            '<td><b>'+esc(monthLabel(r.ym||""))+'</b></td><td class="mono">'+esc(r.no||"")+'</td>'+
+            '<td class="r num">'+fmt(r.total)+'</td><td class="r num">'+fmt(r.done)+'</td><td class="r num">'+n(r.pct)+'%</td>'+
+            '<td>'+esc(r.sentBy||"—")+(r.auto?' <span class="chip">تلقائي</span>':'')+'</td>'+
+            '<td class="mono">'+esc(String(r.sentAt||"").slice(0,10))+'</td>'+
+            '<td>'+repStatusChip(r)+'</td>'+
+            '<td class="mono">'+esc(r.editedAt?String(r.editedAt).slice(0,10):"—")+'</td>'+
+            '<td class="r"><button class="btn sm pri" data-openrep="'+esc(r.id)+'">مراجعة وتعديل</button></td></tr>').join("")+
+          '</tbody></table></div>'
+        : '<div class="empty"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM4 9h16"/></svg>لم تصل تقارير شهرية بعد — تُرسل تلقائياً عند أول دخول للمركز الحكومي بعد نهاية الشهر</div>')+
+    '</div></section>',
+
+    mount(root){
+      $$("[data-go]",root).forEach(b=>b.onclick=()=>go(b.dataset.go));
+      $$("[data-openrep]",root).forEach(b=>b.onclick=()=>openReportDoc(b.dataset.openrep));
+      const nm=$("#chiefNmSave",root);
+      if(nm) nm.onclick=async()=>{
+        const v=$("#chiefNm",root).value.trim();
+        if(!v){ toast("اكتب الاسم"); return; }
+        await Store.saveAccess(Object.assign({},Store.access,{chiefName:v}));
+        toast("تم حفظ الاسم"); render();
+      };
+    }
+  };
+}
+
+/* مراجعة التقرير وتعديله (رئيس الفريق) أو الاطلاع عليه */
+function openReportDoc(id){
+  const r=byId(Store.list("reports"),id); if(!r) return;
+  const canEdit=Access.isChief();
+  let order=orderedSections(r).map(s=>s.k);
+  let hidden=(r.hiddenSections||[]).slice();
+  const titleOf=k=>((orderedSections(r).find(s=>s.k===k)||{}).t)||k;
+  const orderHTML=()=>order.map((k,i)=>
+    '<div class="le-row"><span class="nm">'+(ORD[i]||String(i+1))+' — '+esc(titleOf(k))+'</span>'+
+      '<label class="check" style="margin:0"><input type="checkbox" data-sec-show="'+esc(k)+'"'+(hidden.indexOf(k)<0?" checked":"")+'> إظهار</label>'+
+      '<button type="button" class="btn sm ghost" data-sec-up="'+i+'"'+(i===0?" disabled":"")+' aria-label="تقديم">▲</button>'+
+      '<button type="button" class="btn sm ghost" data-sec-down="'+i+'"'+(i===order.length-1?" disabled":"")+' aria-label="تأخير">▼</button>'+
+    '</div>').join("");
+
+  const summaryCards=
+    '<div class="mini-cards">'+
+      '<div class="mini"><div class="l">إجمالي الأوامر</div><div class="v">'+fmt(r.total)+'</div></div>'+
+      '<div class="mini"><div class="l">منجزة</div><div class="v" style="color:var(--ok)">'+fmt(r.done)+'</div></div>'+
+      '<div class="mini"><div class="l">قيد التنفيذ</div><div class="v" style="color:var(--warn)">'+fmt(r.pending)+'</div></div>'+
+      '<div class="mini"><div class="l">بانتظار قطعة</div><div class="v" style="color:var(--crit)">'+fmt(r.waiting)+'</div></div>'+
+      '<div class="mini"><div class="l">أجهزة مشمولة</div><div class="v">'+fmt(r.devices)+'</div></div>'+
+      '<div class="mini"><div class="l">قطع مصروفة</div><div class="v">'+fmt(r.parts)+'</div></div>'+
+      '<div class="mini"><div class="l">نسبة الإنجاز</div><div class="v">'+n(r.pct)+'%</div></div>'+
+    '</div>';
+
+  const editor = canEdit
+    ? '<div class="sub-head">مراجعة رئيس الفريق</div>'+
+      '<div class="grid-f">'+
+        '<div class="field"><label for="repStatus">حالة التقرير</label><select class="inp" id="repStatus">'+
+          optionsHTML(REPORT_STATUSES, r.status||(r.readAt?"قيد المراجعة":"قيد المراجعة"))+'</select></div>'+
+        '<div class="field wide"><label for="repExec">الملخص التنفيذي</label>'+
+          '<textarea class="inp" id="repExec" rows="4">'+esc(r.execSummary||autoExecSummary(r))+'</textarea>'+
+          '<span class="hint">كُتب ملخص مقترح تلقائياً من أرقام التقرير — عدّله كما تريد.</span></div>'+
+        '<div class="field wide"><label for="repRec">التوصيات</label>'+
+          '<textarea class="inp" id="repRec" rows="3" placeholder="مثال: توريد قطع غيار الطابعات قبل نهاية الشهر القادم">'+esc(r.recommendations||"")+'</textarea></div>'+
+        '<div class="field wide"><label for="ackNote">ملاحظات للمركز الحكومي</label>'+
+          '<textarea class="inp" id="ackNote" rows="3" placeholder="تظهر للمركز الحكومي في صفحة التقرير، خاصة عند إعادة التقرير للتعديل">'+esc(r.ackNote||"")+'</textarea></div>'+
+      '</div>'+
+      '<div class="sub-head">ترتيب أقسام التقرير وإظهارها</div>'+
+      '<div class="le-list" id="secOrder" style="max-height:none">'+orderHTML()+'</div>'
+    : ((r.execSummary||r.recommendations||r.ackNote)
+        ? '<div class="sub-head">مراجعة رئيس الفريق</div>'+
+          (r.execSummary?'<p style="margin:0 0 8px;white-space:pre-wrap">'+esc(r.execSummary)+'</p>':'')+
+          (r.recommendations?'<p style="margin:0 0 8px;white-space:pre-wrap;color:var(--ink-2)"><b>التوصيات: </b>'+esc(r.recommendations)+'</p>':'')+
+          (r.ackNote?'<p style="margin:0;white-space:pre-wrap;color:var(--ink-2)"><b>ملاحظات: </b>'+esc(r.ackNote)+'</p>':'')
+        : '');
+
+  openModal({
+    title:"تقرير "+monthLabel(r.ym||"")+" — "+(r.no||""), size:"lg", focus:false,
+    body:
+      '<div class="pill-row">'+repStatusChip(r)+
+        '<span class="chip mono">'+esc(String(r.sentAt||"").slice(0,10))+'</span>'+
+        '<span class="chip">أرسله: '+esc(r.sentBy||"")+'</span>'+
+        (r.editedAt?'<span class="chip">آخر تعديل: '+esc(String(r.editedAt).slice(0,10))+' — '+esc(r.editedBy||"")+'</span>':'')+
+      '</div>'+
+      summaryCards+
+      (r.note?'<div class="sub-head">ملاحظة المُرسِل</div><p style="margin:0;white-space:pre-wrap;color:var(--ink-2)">'+esc(r.note)+'</p>':'')+
+      editor+
+      '<div class="sub-head">التقرير المرتّب'+(r.arranged&&r.arranged.firstDate?' — من '+esc(r.arranged.firstDate)+' إلى '+esc(r.arranged.lastDate):'')+'</div>'+
+      '<div id="secPreview">'+sectionsHTML(r)+'</div>',
+    onMount(root){
+      if(!canEdit) return;
+      const box=$("#secOrder",root), prev=$("#secPreview",root);
+      const repaint=()=>{
+        box.innerHTML=orderHTML();
+        prev.innerHTML=sectionsHTML(Object.assign({},r,{sectionOrder:order, hiddenSections:hidden}));
+        bind();
+      };
+      const bind=()=>{
+        $$("[data-sec-up]",box).forEach(b=>b.onclick=()=>{ const i=n(b.dataset.secUp); if(i>0){ const t=order[i-1]; order[i-1]=order[i]; order[i]=t; repaint(); } });
+        $$("[data-sec-down]",box).forEach(b=>b.onclick=()=>{ const i=n(b.dataset.secDown); if(i<order.length-1){ const t=order[i+1]; order[i+1]=order[i]; order[i]=t; repaint(); } });
+        $$("[data-sec-show]",box).forEach(c=>c.onchange=()=>{
+          const k=c.dataset.secShow;
+          hidden=hidden.filter(x=>x!==k); if(!c.checked) hidden.push(k);
+          repaint();
+        });
+      };
+      bind();
+    },
+    actions:[].concat(
+      [{label:"فتح شهر التقرير", cls:"btn", act:()=>{ closeModal(); App.reportMonth=r.ym; go("reports"); }}],
+      canEdit?[{label:"تحديث الأرقام من السجلات", cls:"btn", act:async()=>{
+        const keep=App.site; App.site=SITES[1];
+        let m, arr;
+        try{ m=reportSummary(r.ym); arr=arrangeReport(r.ym); } finally { App.site=keep; }
+        await Store.save("reports", Object.assign({}, r, m, {arranged:arr, editedAt:new Date().toISOString(), editedBy:Access.chiefName()}));
+        closeModal(); toast("حُدّثت أرقام التقرير من السجلات الحالية"); render(); openReportDoc(r.id);
+      }}]:[],
+      [{label:"إغلاق", cls:"btn", act:closeModal}],
+      canEdit?[{label:"حفظ التعديلات", cls:"btn pri", act:async()=>{
+        await Store.save("reports", Object.assign({}, r, {
+          status: $("#repStatus").value,
+          execSummary: $("#repExec").value.trim(),
+          recommendations: $("#repRec").value.trim(),
+          ackNote: $("#ackNote").value.trim(),
+          sectionOrder: order.slice(),
+          hiddenSections: hidden.slice(),
+          readAt: r.readAt||new Date().toISOString(),
+          readBy: r.readBy||Access.chiefName(),
+          editedAt: new Date().toISOString(),
+          editedBy: Access.chiefName()
+        }));
+        closeModal(); toast("حُفظت تعديلات التقرير"); render();
+      }}]:[])
+  });
+}
+
 const LATE_DAYS=7;
 function daysSince(d){
   const t=new Date(String(d)+"T00:00:00").getTime();
@@ -2801,224 +3321,6 @@ async function approveMany(ids){
   toast(k?("تم اعتماد "+fmt(k)+" أمر"):"لا يوجد ما يُعتمد");
   render();
 }
-function viewChief(){
-  const ym=ymOf(today());
-  const recs=Store.list("records");
-  const monthRecs=recs.filter(r=>ymOf(r.date)===ym);
-
-  const panel=(site)=>{
-    const rows=monthRecs.filter(r=>r.site===site);
-    const done=rows.filter(r=>r.status==="منجز").length;
-    const wait=rows.filter(r=>r.status==="بانتظار قطعة").length;
-    const open=rows.filter(isOpen).length;
-    const appr=rows.filter(r=>r.approvedAt).length;
-    const low=Store.list("parts").filter(p=>p.site===site && n(p.qty)<=n(p.minQty)).length;
-    return '<div class="site-panel" data-s="'+siteClass(site)+'"><div class="h"><h4>'+esc(site)+'</h4>'+
-      '<span class="chip '+siteClass(site)+'">'+esc(monthLabel(ym))+'</span></div><div class="b">'+
-      '<div class="mini-cards">'+
-        '<div class="mini"><div class="l">أوامر الشهر</div><div class="v">'+fmt(rows.length)+'</div></div>'+
-        '<div class="mini"><div class="l">منجزة</div><div class="v" style="color:var(--ok)">'+fmt(done)+'</div></div>'+
-        '<div class="mini"><div class="l">قيد التنفيذ</div><div class="v" style="color:var(--warn)">'+fmt(open)+'</div></div>'+
-        '<div class="mini"><div class="l">بانتظار قطعة</div><div class="v" style="color:var(--crit)">'+fmt(wait)+'</div></div>'+
-        '<div class="mini"><div class="l">نسبة الإنجاز</div><div class="v">'+(rows.length?Math.round(done/rows.length*100):0)+'%</div></div>'+
-        '<div class="mini"><div class="l">معتمدة</div><div class="v">'+fmt(appr)+'</div></div>'+
-        '<div class="mini"><div class="l">أصناف تحت الحد</div><div class="v" style="color:'+(low?"var(--crit)":"var(--ink)")+'">'+fmt(low)+'</div></div>'+
-      '</div></div></div>';
-  };
-
-  const needRow=(r,ageLab,tone)=>
-    '<div class="need-row" data-rec="'+esc(r.id)+'"><span class="chip '+siteClass(r.site)+'">'+esc(r.site==="المبنى الرئيسي"?"رئيسي":"حكومي")+'</span>'+
-    '<b class="mono">'+esc(r.no||"")+'</b><span>'+esc(r.devType||"")+(r.employee?' · '+esc(r.employee):'')+'</span>'+
-    '<span class="age '+(tone||"")+'">'+esc(ageLab)+'</span></div>';
-
-  const blocked=recs.filter(r=>r.status==="بانتظار قطعة").sort((a,b)=>daysSince(b.date)-daysSince(a.date));
-  const late=recs.filter(r=>isOpen(r) && daysSince(r.date)>=LATE_DAYS).sort((a,b)=>daysSince(b.date)-daysSince(a.date));
-  const low=Store.list("parts").filter(p=>n(p.qty)<=n(p.minQty)).sort((a,b)=>n(a.qty)-n(b.qty));
-  const pending=recs.filter(r=>r.status==="منجز" && !r.approvedAt)
-    .sort((a,b)=>String(a.date).localeCompare(String(b.date)));
-  const inbox=Store.list("reports").slice().sort((a,b)=>String(b.ym||"").localeCompare(String(a.ym||"")));
-
-  const techNames=Array.from(new Set(recs.map(r=>r.tech).filter(Boolean)));
-  const perf=techNames.map(nm=>{
-    const rs=recs.filter(r=>r.tech===nm);
-    const d=rs.filter(r=>r.status==="منجز").length;
-    const last=rs.map(r=>r.date).sort().slice(-1)[0]||"";
-    return {nm:nm, total:rs.length, month:rs.filter(r=>ymOf(r.date)===ym).length, done:d,
-      pct: rs.length?Math.round(d/rs.length*100):0,
-      openC: rs.filter(isOpen).length,
-      parts: rs.reduce((s,r)=>s+(r.parts||[]).reduce((x,p)=>x+n(p.qty),0),0),
-      last:last};
-  }).sort((a,b)=>b.month-a.month||b.total-a.total);
-
-  return {
-    html:
-    '<div class="page-head"><div>'+
-      '<div class="eyebrow">صفحة خاصة — لا تظهر لأي جهة أخرى</div>'+
-      '<h2>لوحة رئيس القسم</h2>'+
-      '<p>ما يحتاج قراراً اليوم، ومقارنة الموقعين، واعتماد الأوامر المنجزة قبل رفع التقرير الشهري.</p>'+
-    '</div><div class="sp">'+
-      '<button class="btn" data-go="reports">التقرير الشهري ←</button>'+
-    '</div></div>'+
-
-    '<div class="chief-band">'+
-      '<div><div class="t">'+esc(Access.chiefName())+'</div>'+
-        '<div class="s">هذا الاسم يظهر بجانب كل أمر تعتمده وفي التقارير</div></div>'+
-      '<div class="sp">'+
-        '<div class="field"><label for="chiefNm">اسم رئيس القسم</label><input class="inp" id="chiefNm" value="'+esc(Access.chiefName())+'"></div>'+
-        '<button class="btn" id="chiefNmSave">حفظ الاسم</button>'+
-      '</div>'+
-    '</div>'+
-
-    '<div class="charts" style="margin-bottom:14px">'+panel(SITES[0])+panel(SITES[1])+'</div>'+
-
-    '<div class="charts">'+
-      '<section class="card"><div class="card-h"><h3>موقوفة بانتظار قطعة غيار</h3>'+
-        '<span class="chip'+(blocked.length?" crit":"")+'">'+fmt(blocked.length)+'</span></div>'+
-        '<div class="card-b">'+(blocked.length
-          ? '<div class="need">'+blocked.slice(0,20).map(r=>needRow(r, daysSince(r.date)+" يوم", "crit")).join("")+'</div>'
-          : '<div class="empty" style="padding:24px">لا يوجد أمر موقوف على المخزن</div>')+'</div></section>'+
-
-      '<section class="card"><div class="card-h"><h3>متأخرة عن '+LATE_DAYS+' أيام</h3>'+
-        '<span class="chip'+(late.length?" warn":"")+'">'+fmt(late.length)+'</span></div>'+
-        '<div class="card-b">'+(late.length
-          ? '<div class="need">'+late.slice(0,20).map(r=>needRow(r, daysSince(r.date)+" يوم", "warn")).join("")+'</div>'
-          : '<div class="empty" style="padding:24px">لا توجد أوامر متأخرة</div>')+'</div></section>'+
-
-      '<section class="card"><div class="card-h"><h3>مخزون تحت الحد الأدنى</h3>'+
-        '<span class="chip'+(low.length?" crit":"")+'">'+fmt(low.length)+'</span></div>'+
-        '<div class="card-b">'+(low.length
-          ? '<div class="need">'+low.slice(0,20).map(p=>
-              '<div class="need-row" data-part="1"><span class="chip '+siteClass(p.site)+'">'+esc(p.site==="المبنى الرئيسي"?"رئيسي":"حكومي")+'</span>'+
-              '<b>'+esc(p.name)+'</b><span class="mono" style="color:var(--ink-3)">'+esc(p.code||"")+'</span>'+
-              '<span class="age crit">'+fmt(p.qty)+" / "+fmt(p.minQty)+'</span></div>').join("")+'</div>'
-          : '<div class="empty" style="padding:24px">المخزون سليم في الموقعين</div>')+'</div></section>'+
-    '</div>'+
-
-    '<section class="card" style="margin-top:14px"><div class="card-h"><h3>التقارير الشهرية الواردة</h3>'+
-      '<span class="chip'+(inbox.filter(r=>!r.readAt).length?" warn":"")+'">'+fmt(inbox.filter(r=>!r.readAt).length)+' جديد</span></div>'+
-      '<div class="card-b" style="padding-top:8px">'+(inbox.length
-        ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>الشهر</th><th>رقم التقرير</th><th>النطاق</th>'+
-          '<th class="r">الأوامر</th><th class="r">منجزة</th><th class="r">الإنجاز</th><th>أرسله</th><th>تاريخ الإرسال</th><th>الحالة</th><th></th></tr></thead><tbody>'+
-          inbox.map(r=>'<tr class="'+(r.readAt?"":"unread")+'">'+
-            '<td><b>'+esc(monthLabel(r.ym||""))+'</b></td><td class="mono">'+esc(r.no||"")+'</td>'+
-            '<td>'+esc(r.coverage||"—")+'</td>'+
-            '<td class="r num">'+fmt(r.total)+'</td><td class="r num">'+fmt(r.done)+'</td><td class="r num">'+n(r.pct)+'%</td>'+
-            '<td>'+esc(r.sentBy||"—")+(r.auto?' <span class="chip">تلقائي</span>':'')+'</td><td class="mono">'+esc(String(r.sentAt||"").slice(0,10))+'</td>'+
-            '<td>'+(r.readAt?'<span class="badge-ok">✓ اطّلعت</span>':'<span class="chip warn"><i></i>جديد</span>')+'</td>'+
-            '<td class="r"><button class="btn sm" data-openrep="'+esc(r.id)+'">فتح</button></td></tr>').join("")+
-          '</tbody></table></div>'
-        : '<div class="empty"><svg viewBox="0 0 24 24"><path d="M4 4h16v16H4zM4 9h16"/></svg>لم تصل تقارير شهرية بعد</div>')+
-    '</div></section>'+
-
-    '<section class="card" style="margin-top:14px"><div class="card-h"><h3>اعتماد الأوامر المنجزة</h3>'+
-      '<span class="chip'+(pending.length?" warn":" ok")+'">'+fmt(pending.length)+' بانتظار الاعتماد</span>'+
-      '<div class="sp">'+(pending.length?'<button class="btn sm" id="apvSel">اعتماد المحدد</button>'+
-        '<button class="btn sm pri" id="apvAll">اعتماد الكل</button>':'')+'</div></div>'+
-      '<div class="card-b" style="padding-top:8px">'+(pending.length
-        ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th class="apv-cell"><input type="checkbox" id="apvTop" aria-label="تحديد الكل"></th>'+
-          '<th>رقم السجل</th><th>التاريخ</th><th>الموقع</th><th>الجهاز</th><th>الموظف</th><th>الفني</th><th>نوع الصيانة</th><th class="r">العمر</th></tr></thead><tbody>'+
-          pending.map(r=>'<tr class="stripe '+siteClass(r.site)+'"><td class="apv-cell"><input type="checkbox" class="apv" value="'+esc(r.id)+'" aria-label="تحديد '+esc(r.no||"")+'"></td>'+
-            '<td><b class="mono clickable" data-rec="'+esc(r.id)+'" style="cursor:pointer;text-decoration:underline;text-underline-offset:3px">'+esc(r.no||"")+'</b></td>'+
-            '<td class="mono">'+esc(r.date||"")+'</td>'+
-            '<td><span class="chip '+siteClass(r.site)+'">'+esc(r.site)+'</span></td>'+
-            '<td>'+esc(r.devType||"—")+'</td><td>'+esc(r.employee||"—")+'</td><td>'+esc(r.tech||"—")+'</td>'+
-            '<td>'+esc(r.mtype||"—")+'</td><td class="r num">'+fmt(daysSince(r.date))+' يوم</td></tr>').join("")+
-          '</tbody></table></div>'
-        : '<div class="empty"><svg viewBox="0 0 24 24"><path d="M20 6L9 17l-5-5"/></svg>كل الأوامر المنجزة معتمدة</div>')+
-    '</div></section>'+
-
-    '<section class="card" style="margin-top:14px"><div class="card-h"><h3>أداء الفنيين في الموقعين</h3></div>'+
-      '<div class="card-b" style="padding-top:8px">'+(perf.length
-        ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>الفني</th><th class="r">هذا الشهر</th><th class="r">الإجمالي</th>'+
-          '<th class="r">منجزة</th><th class="r">قيد العمل</th><th class="r">نسبة الإنجاز</th><th class="r">قطع مصروفة</th><th>آخر أمر</th></tr></thead><tbody>'+
-          perf.map(p=>'<tr class="clickable" data-tech="'+esc(p.nm)+'"><td><b>'+esc(p.nm)+'</b></td>'+
-            '<td class="r num">'+fmt(p.month)+'</td><td class="r num">'+fmt(p.total)+'</td>'+
-            '<td class="r num">'+fmt(p.done)+'</td><td class="r num'+(p.openC?" qty-low":"")+'">'+fmt(p.openC)+'</td>'+
-            '<td class="r num">'+p.pct+'%</td><td class="r num">'+fmt(p.parts)+'</td>'+
-            '<td class="mono">'+esc(p.last||"—")+'</td></tr>').join("")+
-          '</tbody></table></div>'
-        : '<div class="empty">لا توجد أوامر مسجّلة بعد</div>')+
-    '</div></section>',
-
-    mount(root){
-      $$("[data-go]",root).forEach(b=>b.onclick=()=>go(b.dataset.go));
-      $$("[data-rec]",root).forEach(el=>el.onclick=e=>{ e.stopPropagation(); openRecord(el.dataset.rec); });
-      $$("[data-tech]",root).forEach(el=>el.onclick=()=>openTechLog(el.dataset.tech));
-      $$("[data-openrep]",root).forEach(b=>b.onclick=()=>openReportDoc(b.dataset.openrep));
-      const nm=$("#chiefNmSave",root);
-      if(nm) nm.onclick=async()=>{
-        const v=$("#chiefNm",root).value.trim();
-        if(!v){ toast("اكتب الاسم"); return; }
-        await Store.saveAccess(Object.assign({},Store.access,{chiefName:v}));
-        toast("تم حفظ الاسم"); render();
-      };
-      const top=$("#apvTop",root);
-      if(top) top.onchange=()=>$$(".apv",root).forEach(c=>c.checked=top.checked);
-      const sel=$("#apvSel",root);
-      if(sel) sel.onclick=()=>{
-        const ids=$$(".apv",root).filter(c=>c.checked).map(c=>c.value);
-        if(!ids.length){ toast("حدّد أوامر أولاً"); return; }
-        confirmBox("اعتماد الأوامر","سيُعتمد "+fmt(ids.length)+" أمر باسم "+Access.chiefName()+".",()=>approveMany(ids),"اعتماد");
-      };
-      const all=$("#apvAll",root);
-      if(all) all.onclick=()=>{
-        const ids=$$(".apv",root).map(c=>c.value);
-        confirmBox("اعتماد كل الأوامر","سيُعتمد "+fmt(ids.length)+" أمر منجز باسم "+Access.chiefName()+".",()=>approveMany(ids),"اعتماد الكل");
-      };
-    }
-  };
-}
-
-function openReportDoc(id){
-  const r=byId(Store.list("reports"),id); if(!r) return;
-  const rows=(r.bySite||[]);
-  openModal({
-    title:"تقرير "+monthLabel(r.ym||"")+" — "+(r.no||""), size:"lg",
-    body:
-      '<div class="pill-row"><span class="chip">'+esc(r.coverage||"")+'</span>'+
-        '<span class="chip mono">'+esc(String(r.sentAt||"").slice(0,10))+'</span>'+
-        '<span class="chip">أرسله: '+esc(r.sentBy||"")+'</span>'+
-        (r.readAt?'<span class="chip ok"><i></i>اطّلعت بتاريخ '+esc(String(r.readAt).slice(0,10))+'</span>':'<span class="chip warn"><i></i>جديد</span>')+
-      '</div>'+
-      '<div class="mini-cards">'+
-        '<div class="mini"><div class="l">إجمالي الأوامر</div><div class="v">'+fmt(r.total)+'</div></div>'+
-        '<div class="mini"><div class="l">منجزة</div><div class="v" style="color:var(--ok)">'+fmt(r.done)+'</div></div>'+
-        '<div class="mini"><div class="l">قيد التنفيذ</div><div class="v" style="color:var(--warn)">'+fmt(r.pending)+'</div></div>'+
-        '<div class="mini"><div class="l">بانتظار قطعة</div><div class="v" style="color:var(--crit)">'+fmt(r.waiting)+'</div></div>'+
-        '<div class="mini"><div class="l">أجهزة مشمولة</div><div class="v">'+fmt(r.devices)+'</div></div>'+
-        '<div class="mini"><div class="l">قطع مصروفة</div><div class="v">'+fmt(r.parts)+'</div></div>'+
-        '<div class="mini"><div class="l">نسبة الإنجاز</div><div class="v">'+n(r.pct)+'%</div></div>'+
-        '<div class="mini"><div class="l">معتمدة</div><div class="v">'+fmt(r.approved)+'</div></div>'+
-      '</div>'+
-      (rows.length>1?'<div class="sub-head">حسب الموقع</div>'+
-        simpleTable(["الموقع","الأوامر","منجزة","نسبة الإنجاز"], rows.map(b=>[b.site,fmt(b.total),fmt(b.done),n(b.pct)+"%"])):'')+
-      (r.note?'<div class="sub-head">ملاحظة المُرسِل</div><p style="margin:0;white-space:pre-wrap;color:var(--ink-2)">'+esc(r.note)+'</p>':'')+
-      ((r.arranged && r.arranged.sections)
-        ? '<div class="sub-head">التقرير المرتّب'+(r.arranged.firstDate?' — من '+esc(r.arranged.firstDate)+' إلى '+esc(r.arranged.lastDate):'')+'</div>'+
-          r.arranged.sections.filter(sec=>(sec.rows&&sec.rows.length)||(sec.list&&sec.list.length)).map((sec,i)=>
-            '<div class="rep-sec" style="padding:12px 0"><h3><span class="ord">'+(ORD[i]||String(i+1))+'</span>'+esc(sec.t)+'</h3>'+
-            (sec.rows
-              ? simpleTable([sec.t,"العدد"], sec.rows.map(x=>[x.label, fmt(x.value)]))
-              : simpleTable(["رقم السجل","التاريخ","الجهاز","الفني","الحالة"], sec.list.map(o=>[o.no,o.date,o.dev,o.tech,o.status])))+
-            '</div>').join("")
-        : '')+
-      '<div class="sub-head">ملاحظات رئيس القسم</div>'+
-      '<textarea class="inp" id="ackNote" placeholder="توجيهاتك على هذا التقرير…">'+esc(r.ackNote||"")+'</textarea>',
-    actions:[
-      {label:"فتح شهر التقرير", cls:"btn", act:()=>{ closeModal(); App.reportMonth=r.ym; go("reports"); }},
-      {label:"إغلاق", cls:"btn", act:closeModal},
-      {label:r.readAt?"حفظ الملاحظات":"تأكيد الاطّلاع", cls:"btn pri", act:async()=>{
-        const note=$("#ackNote").value.trim();
-        await Store.save("reports", Object.assign({},r,{
-          readAt: r.readAt||new Date().toISOString(),
-          readBy: r.readBy||Access.chiefName(),
-          ackNote: note
-        }));
-        closeModal(); toast(r.readAt?"حُفظت الملاحظات":"تم تأكيد الاطّلاع"); render();
-      }}
-    ]
-  });
-}
 
 /* ============================================================
    16. الإعدادات
@@ -3035,9 +3337,9 @@ async function pwChange(target,verifyKey,cur,a,b){
   }
   if(a.length<4) return "كلمة السر الجديدة يجب ألا تقل عن ٤ أحرف.";
   if(a!==b) return "كلمتا السر غير متطابقتين.";
-  if(!cur) return verifyKey===ADMIN_KEY ? "أدخل كلمة سر مشرف الفريق للتحقق." : "أدخل كلمة السر الحالية.";
+  if(!cur) return (verifyKey===CHIEF_KEY && target!==CHIEF_KEY) ? "أدخل كلمة سر رئيس الفريق للتحقق." : "أدخل كلمة السر الحالية.";
   if(!(await Access.checkAny(verifyKey,cur)).ok)
-    return verifyKey===ADMIN_KEY ? "كلمة سر مشرف الفريق غير صحيحة." : "كلمة السر الحالية غير صحيحة.";
+    return (verifyKey===CHIEF_KEY && target!==CHIEF_KEY) ? "كلمة سر رئيس الفريق غير صحيحة." : "كلمة السر الحالية غير صحيحة.";
   for(const t of PW_TARGETS){
     if(t.k!==target && await Access.check(t.k,a)) return "هذه الكلمة مستخدمة لـ«"+t.nm+"» — اختر كلمة مختلفة لكل جهة.";
   }
@@ -3046,26 +3348,26 @@ async function pwChange(target,verifyKey,cur,a,b){
 }
 function securityNote(){
   if(Access.auth()) return '<p class="note" style="margin-top:14px">الحماية مطبّقة على خادم Firebase: '+
-    'قواعد الأمان لا تسمح لحساب أي موقع بقراءة بيانات الموقع الآخر أو تعديلها، وحساب رئيس القسم وحده يصل إلى القاعدتين. '+
+    'قواعد الأمان تحصر الوصول في حسابي المركز الحكومي ورئيس الفريق. '+
     'إن نُسيت كلمة سر جهة: احذف حسابها من Firebase Console ← Authentication وأنشئه من جديد بالبريد نفسه.</p>';
   return '<p class="note" style="margin-top:14px">كلمات السر تفصل الجهات على مستوى الاستخدام اليومي. '+
-  'لكل موقع قاعدة بيانات منفصلة لا تُفتح إلا لجهته، وتُجمع القاعدتان عند رئيس القسم فقط. '+
+  'رئيس الفريق يرى التقارير الشهرية ويعدّلها فقط، ولا يصل إلى أوامر الصيانة أو المخزن من واجهته. '+
   'مع ذلك هذه ليست حماية أمنية كاملة — الفصل يتم داخل النظام، ومن يملك خبرة تقنية ويصل إلى الرابط يستطيع تجاوزه. '+
   'للحماية على مستوى الخادم استخدم نسخة Firebase.</p>';
 }
 
 function viewSettings(){
   const c=Store.config;
-  const admin=Access.isAdmin();
+  const admin=Access.isChief();
   const mgr=canManageAny();
   const cnt=(label,v)=>'<div class="mini"><div class="l">'+esc(label)+'</div><div class="v">'+fmt(v)+'</div></div>';
   return {
     html:
     '<div class="page-head"><div><div class="eyebrow">إدارة النظام</div><h2>الإعدادات</h2>'+
       '<p>'+(admin
-        ? 'إدارة موظفي المركز الحكومي وقطع غياره وكلمات سره تتم من صفحة «مشرف الفريق».'
+        ? 'الفنيون ومواقع العمل والموظفون وقطع الغيار وكلمات السر تُدار من صفحات «الفنيون» و«بدل الموقع» و«إدارة المركز».'
         : (mgr ? 'إدارة موظفي المبنى الرئيسي وقطع غياره تتم من صفحة «'+managerTitle()+'».'
-               : 'بيانات حسابك والنسخ الاحتياطي. إضافة الموظفين وتعديل قطع الغيار من صلاحية مشرف الفريق.'))+'</p></div>'+
+               : 'بيانات حسابك والنسخ الاحتياطي. إضافة الفنيين والموظفين ومواقع العمل وتعديل قطع الغيار من صلاحية رئيس الفريق.'))+'</p></div>'+
       (mgr?'<div class="sp"><button class="btn pri" data-sup="'+(admin?"passwords":"employees")+'">فتح صفحة '+esc(managerTitle())+' ←</button></div>':'')+
     '</div>'+
     '<div class="charts">'+
@@ -3080,14 +3382,14 @@ function viewSettings(){
               '<button class="btn" data-sup="lists">تعديل الأقسام والقطاعات</button>'+
               '<button class="btn" data-sup="employees">إدارة الموظفين</button>'+
               '<button class="btn" data-sup="parts">إدارة قطع الغيار</button></div>'
-          : '<p class="note" style="margin-top:14px">لإضافة موظف أو قسم، أو تعديل أصناف قطع الغيار، تواصل مع مشرف الفريق.</p>')+
+          : '<p class="note" style="margin-top:14px">لإضافة موظف أو قسم، أو تعديل أصناف قطع الغيار، تواصل مع رئيس الفريق.</p>')+
       '</div></section>'+
 
       '<section class="card"><div class="card-h"><h3>البيانات والنسخ الاحتياطي</h3></div><div class="card-b">'+
         '<dl class="kv" style="margin-bottom:14px">'+
           kv("جهة الدخول الحالية", Access.label())+
           kv("طريقة التخزين", (Store.mode==="firebase"?"Firebase — ":(Store.mode==="db"?"":"تخزين محلي على هذا المتصفح — "))+
-            (Store.open.length>1 ? "قاعدتا "+Store.openNames().join(" و")+" مجمّعتان لرئيس القسم"
+            (Store.open.length>1 ? "قاعدتا "+Store.openNames().join(" و")
                                  : "قاعدة "+(Store.openNames()[0]||"الموقع")+" وحدها"))+
           kv("أوامر الصيانة",fmt(siteFilter(Store.list("records")).length))+
           kv("أصناف المخزن",fmt(siteFilter(Store.list("parts")).length))+
@@ -3095,16 +3397,17 @@ function viewSettings(){
           kv("الفنيون",fmt(Store.list("technicians").filter(t=>Access.bothSites()||!t.site||t.site==="كلا الموقعين"||allowedSites().indexOf(t.site)>=0).length))+
         '</dl>'+
         '<div style="display:flex;gap:9px;flex-wrap:wrap">'+
+          '<button class="btn pri" id="expXlsx"><svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9zM14 3v6h6M9 12l5 6M14 12l-5 6"/></svg>تصدير كل البيانات إلى Excel</button>'+
           '<button class="btn" id="expAll">تصدير نسخة احتياطية (JSON)</button>'+
           (admin?'<button class="btn" id="impAll">استيراد نسخة</button><input type="file" accept="application/json,.json" id="impFile" hidden>':'')+
         '</div>'+
         '<p class="note" style="margin-top:14px">النسخة الاحتياطية تشمل ما تملك صلاحية رؤيته من السجلات والمخزن والحركات والفنيين والموظفين، مع القوائم. صور السيريال لا تُدرج لأنها كبيرة الحجم.'+
-          (admin?'':' الاستيراد من صلاحية مشرف الفريق.')+'</p>'+
+          (admin?'':' الاستيراد من صلاحية رئيس الفريق.')+'</p>'+
       '</div></section>'+
 
       (admin && !Access.auth()
-        ? '<section class="card"><div class="card-h"><h3>كلمات السر</h3><span class="chip">مشرف الفريق</span></div><div class="card-b">'+
-            '<p style="margin:0 0 12px;color:var(--ink-2)">ضبط كلمة سر المركز الحكومي وكلمة سرك وتغييرهما من صفحة مشرف الفريق.</p>'+
+        ? '<section class="card"><div class="card-h"><h3>كلمات السر</h3><span class="chip">إدارة المركز</span></div><div class="card-b">'+
+            '<p style="margin:0 0 12px;color:var(--ink-2)">ضبط كلمة سر المركز الحكومي وكلمة سر رئيس الفريق وتغييرهما من صفحة إدارة المركز.</p>'+
             '<button class="btn" data-sup="passwords">إدارة كلمات السر</button></div></section>'
         : '<section class="card"><div class="card-h"><h3>كلمة السر</h3>'+
             '<span class="chip'+(Access.bothSites()?"":" "+siteClass(Access.state.scope))+'">'+esc(Access.label())+'</span></div><div class="card-b">'+
@@ -3112,7 +3415,7 @@ function viewSettings(){
               '<div class="field wide"><label>كلمة السر المراد تغييرها</label><input class="inp" value="'+esc(Access.label())+'" readonly>'+
               '<span class="hint">'+(Access.auth()
                 ? 'تغيّر كلمة سر حساب «'+esc(Access.label())+'» في Firebase — كل جهة تغيّر كلمة سرها بعد الدخول بحسابها.'
-                : 'تغيّر كلمة سرك وحدها — كلمات سر باقي الجهات بيد مشرف الفريق.')+'</span></div>'+
+                : 'تغيّر كلمة سرك وحدها — كلمة سر المركز الحكومي يعيد ضبطها رئيس الفريق.')+'</span></div>'+
               pwField("pwCur","كلمة السر الحالية",{auto:"current-password"})+
               pwField("pwNew","كلمة السر الجديدة",{auto:"new-password", ph:(Access.auth()?"٦":"٤")+" أحرف على الأقل"})+
               pwField("pwNew2","تأكيد كلمة السر الجديدة",{auto:"new-password"})+
@@ -3121,15 +3424,15 @@ function viewSettings(){
             '<div class="gate-err" id="pwErr" style="margin-top:12px"></div>'+
             securityNote()+
           '</div></section>')+
-      ((Access.state.scope===SITES[1] && !Access.hasAdmin())
-        ? '<section class="card"><div class="card-h"><h3>كلمة سر مشرف الفريق</h3><span class="chip warn">غير مضبوطة</span></div><div class="card-b">'+
-            '<p style="margin:0 0 12px;color:var(--ink-2)">لم تُضبط كلمة سر مشرف الفريق بعد، لذلك لا يستطيع أحد فتح صفحة المشرف. اضبطها هنا بعد التحقق بكلمة سرك الحالية.</p>'+
+      ((false)
+        ? '<section class="card"><div class="card-h"><h3>كلمة سر إدارة المركز</h3><span class="chip warn">غير مضبوطة</span></div><div class="card-b">'+
+            '<p style="margin:0 0 12px;color:var(--ink-2)">لم تُضبط كلمة سر إدارة المركز بعد، لذلك لا يستطيع أحد فتح صفحة المشرف. اضبطها هنا بعد التحقق بكلمة سرك الحالية.</p>'+
             '<div class="grid-f">'+
               pwField("supCur","كلمة سرك الحالية (للتحقق)",{auto:"current-password"})+
-              pwField("supNew","كلمة سر مشرف الفريق",{auto:"new-password", ph:"٤ أحرف على الأقل"})+
+              pwField("supNew","كلمة سر إدارة المركز",{auto:"new-password", ph:"٤ أحرف على الأقل"})+
               pwField("supNew2","تأكيد كلمة السر",{auto:"new-password"})+
             '</div>'+
-            '<div style="display:flex;gap:9px;margin-top:14px"><button class="btn pri" id="supSet">ضبط كلمة سر مشرف الفريق</button></div>'+
+            '<div style="display:flex;gap:9px;margin-top:14px"><button class="btn pri" id="supSet">ضبط كلمة سر إدارة المركز</button></div>'+
             '<div class="gate-err" id="supErr" style="margin-top:12px"></div>'+
           '</div></section>'
         : '')+
@@ -3142,7 +3445,7 @@ function viewSettings(){
         supSet.disabled=true;
         const msg=await pwChange(ADMIN_KEY, Access.state.scope, $("#supCur",root).value, $("#supNew",root).value, $("#supNew2",root).value);
         if(msg){ e.textContent=msg; e.classList.add("on"); supSet.disabled=false; return; }
-        toast("تم ضبط كلمة سر مشرف الفريق — اخرج ثم ادخل باختيار «مشرف الفريق»"); render();
+        toast("تم ضبط كلمة سر إدارة المركز — اخرج ثم ادخل باختيار «إدارة المركز»"); render();
       };
       const save1=$("#pwSave",root);
       if(save1) save1.onclick=async()=>{
@@ -3152,6 +3455,30 @@ function viewSettings(){
         if(msg){ e.textContent=msg; e.classList.add("on"); save1.disabled=false; return; }
         toast("تم تغيير كلمة السر"); render();
       };
+      $("#expXlsx",root).onclick=()=>xlRun("البيانات", async wb=>{
+        const recs=siteFilter(Store.list("records"));
+        xlRecordsSheet(wb, "سجل الصيانة", "سجل صيانة الأجهزة — كامل", recs);
+        xlSummarySheet(wb, "ملخص", "ملخص عام", xlSub(fmt(recs.length)+" أمر"), recs);
+        xlPartsSheet(wb, siteFilter(Store.list("parts")));
+        xlMovesSheet(wb, siteFilter(Store.list("movements")));
+        const techs=Store.list("technicians");
+        xlSheetTable(wb,{name:"الفنيون", title:"الفنيون", sub:xlSub(fmt(techs.length)+" فني"), tab:"FF4257C8",
+          columns:[{h:"الاسم",bold:true},{h:"التخصص"},{h:"الهاتف",center:true},{h:"الحالة",center:true,tone:r=>r[3]==="نشط"?XL.tone.ok:XL.tone.none},
+            {h:"إجمالي الأوامر",num:true,sum:true},{h:"منجزة",num:true,sum:true}],
+          rows:techs.map(t=>{ const rs=recs.filter(r=>r.tech===t.name);
+            return [t.name||"", t.specialty||"", t.phone||"", t.active===false?"غير نشط":"نشط", rs.length, rs.filter(r=>r.status==="منجز").length]; }),
+          totals:techs.length>1});
+        const emps=Store.list("employees");
+        xlSheetTable(wb,{name:"الموظفون", title:"سجل الموظفين", sub:xlSub(fmt(emps.length)+" موظف"), tab:"FF4257C8",
+          columns:[{h:"الاسم",bold:true},{h:"الرقم الوظيفي",center:true},{h:"القطاع"},{h:"القسم"},{h:"الطابق",center:true},{h:"الهاتف",center:true},{h:"أوامر الصيانة",num:true}],
+          rows:emps.map(e=>[e.name||"", e.jobNo||"", e.sector||"", e.dept||"", e.floor||"", e.phone||"", recs.filter(r=>r.employee===e.name).length])});
+        const locs=scopedLocations();
+        xlSheetTable(wb,{name:"مواقع العمل", title:"مواقع العمل", sub:xlSub(fmt(locs.length)+" موقع"), tab:"FF8B3BAE",
+          columns:[{h:"الموقع",bold:true},{h:"الأقسام فيه",wrap:true,w:30},{h:"خط العرض",center:true,w:12},{h:"خط الطول",center:true,w:12},{h:"نطاق الحضور (م)",num:true},{h:"الأوامر",num:true},{h:"ملاحظة",wrap:true,w:30}],
+          rows:locs.map(l=>[l.name||"", deptsAt(l.id).join("، "), isFinite(n(l.lat))&&n(l.lat)!==0?fmtCoord(n(l.lat)):"", isFinite(n(l.lng))&&n(l.lng)!==0?fmtCoord(n(l.lng)):"",
+            n(l.radius||200), recs.filter(r=>r.locId===l.id).length, l.note||""])});
+        return "بيانات-صيانة-الأجهزة-"+today()+".xlsx";
+      });
       $("#expAll",root).onclick=()=>{
         const allow=allowedSites();
         const data={exportedAt:new Date().toISOString(), scope:Access.label(), config:Store.config};
@@ -3186,7 +3513,7 @@ function viewSettings(){
 }
 
 /* ============================================================
-   16.5 صفحة مشرف الفريق
+   16.5 صفحة إدارة المركز
    ============================================================ */
 const Sup={tab:"passwords", q:"", site:"", dept:"", pq:"", psite:""};
 const SUP_TABS=[
@@ -3198,10 +3525,10 @@ const SUP_TABS=[
 ];
 function viewSupervisor(){
   const ms=manageSites();
-  if(!Access.isAdmin() && Sup.tab==="passwords") Sup.tab="employees";
+  if(!Access.isChief() && Sup.tab==="passwords") Sup.tab="employees";
   if(Sup.site && ms.indexOf(Sup.site)<0) Sup.site="";
   if(Sup.psite && ms.indexOf(Sup.psite)<0) Sup.psite="";
-  const tabs='<div class="seg" role="tablist" aria-label="'+esc(managerTitle())+'">'+SUP_TABS.filter(t=>t.k!=="passwords"||Access.isAdmin()).map(t=>{
+  const tabs='<div class="seg" role="tablist" aria-label="'+esc(managerTitle())+'">'+SUP_TABS.filter(t=>t.k!=="passwords"||Access.isChief()).map(t=>{
     const badge = t.k==="employees" ? Store.list("employees").filter(e=>!e.site||ms.indexOf(e.site)>=0).length
                 : t.k==="locations" ? Store.list("locations").filter(l=>ms.indexOf(l.site)>=0).length
                 : (t.k==="parts" ? Store.list("parts").filter(p=>ms.indexOf(p.site)>=0).length : null);
@@ -3212,8 +3539,8 @@ function viewSupervisor(){
   return {
     html:
       '<div class="page-head"><div><div class="eyebrow">'+esc(ms.join("، "))+'</div><h2>'+esc(managerTitle())+'</h2>'+
-        '<p>'+(Access.isAdmin()
-          ? 'صلاحيات مشرف فريق المركز الحكومي: كلمات سر المركز، وموظفوه، والأقسام والقطاعات وطوابقه، وأصناف قطع غياره.'
+        '<p>'+(Access.isChief()
+          ? 'صلاحيات رئيس الفريق لإدارة المركز الحكومي: كلمات السر، والموظفون، ومواقع العمل، والأقسام والقطاعات والطوابق، وأصناف قطع الغيار.'
           : 'إدارة موظفي المبنى الرئيسي، والأقسام والقطاعات وطوابقه، وأصناف قطع غياره.')+'</p></div></div>'+
       tabs+part.html,
     mount(root){
@@ -3226,7 +3553,7 @@ function viewSupervisor(){
 /* ---- كلمات السر ---- */
 function supPasswords(){
   if(Access.auth()){
-    const rows=[[SITES[1],roleEmail(SITES[1])],["مشرف الفريق",roleEmail(ADMIN_KEY)]];
+    const rows=[[SITES[1],roleEmail(SITES[1])],["رئيس الفريق",roleEmail(CHIEF_KEY)]];
     return {
       html:'<section class="card"><div class="card-h"><h3>حسابات المركز الحكومي</h3><span class="chip">Firebase</span></div><div class="card-b">'+
         '<p style="margin:0 0 12px;color:var(--ink-2)">كلمات السر محفوظة في Firebase Authentication. كل جهة تغيّر كلمة سر حسابها من صفحة الإعدادات بعد الدخول به.</p>'+
@@ -3239,11 +3566,11 @@ function supPasswords(){
   }
   const e=Access.entries();
   return {
-    html:'<section class="card"><div class="card-h"><h3>كلمات سر المركز الحكومي</h3></div><div class="card-b">'+
+    html:'<section class="card"><div class="card-h"><h3>كلمات السر</h3></div><div class="card-b">'+
       '<div class="grid-f" style="margin-bottom:6px">'+
-        pwField("pwCur","كلمة سر مشرف الفريق (للتحقق قبل أي تغيير)",{auto:"current-password", wide:true})+
+        pwField("pwCur","كلمة سر رئيس الفريق (للتحقق قبل أي تغيير)",{auto:"current-password", wide:true})+
       '</div>'+
-      '<div class="pw-list">'+PW_TARGETS.map((t,i)=> (t.k!==SITES[1] && t.k!==ADMIN_KEY) ? '' :
+      '<div class="pw-list">'+PW_TARGETS.map((t,i)=> (t.k!==SITES[1] && t.k!==CHIEF_KEY) ? '' :
         '<div class="pw-item">'+
           '<div class="pw-head"><b>'+esc(t.nm)+'</b>'+
             '<span class="chip'+(e[t.k]?" ok":" warn")+'">'+(e[t.k]?"مضبوطة":"غير مضبوطة")+'</span>'+
@@ -3261,10 +3588,10 @@ function supPasswords(){
     mount(root){
       $$("[data-setpw]",root).forEach(b=>b.onclick=async()=>{
         const i=n(b.dataset.setpw), t=PW_TARGETS[i];
-        if(t.k!==SITES[1] && t.k!==ADMIN_KEY) return;
+        if(t.k!==SITES[1] && t.k!==CHIEF_KEY) return;
         const er=$("#pwErr",root); er.classList.remove("on");
         b.disabled=true;
-        const msg=await pwChange(t.k, ADMIN_KEY, $("#pwCur",root).value, $("#pwn"+i,root).value, $("#pwc"+i,root).value);
+        const msg=await pwChange(t.k, CHIEF_KEY, $("#pwCur",root).value, $("#pwn"+i,root).value, $("#pwc"+i,root).value);
         if(msg){ er.textContent=msg; er.classList.add("on"); b.disabled=false; return; }
         toast("تم حفظ كلمة سر "+t.nm); render();
       });
@@ -3435,7 +3762,7 @@ function supLists(){
               ? '<label class="check" style="margin-top:12px"><input type="checkbox" id="renCascade" checked> تحديث البيانات المرتبطة ('+
                 [u.emps?fmt(u.emps)+" موظف":"",u.recs?fmt(u.recs)+" أمر صيانة":""].filter(Boolean).join(" و")+')</label>'
               : '')+
-            (d.site ? '' : '<p class="hint" style="margin-top:10px">هذه القائمة مشتركة بين الموقعين؛ تحديث البيانات المرتبطة يشمل '+esc(manageSites().join("، "))+' فقط.</p>'),
+            '',
           actions:[
             {label:"إلغاء", cls:"btn", act:closeModal},
             {label:"حفظ", cls:"btn pri", act:async()=>{
@@ -3620,7 +3947,7 @@ function locPickerHTML(rec){
   const sel=rec?(rec.locId||""):"";
   if(!locs.length){
     return '<div class="field wide"><label>موقع العمل</label>'+
-      '<p class="note" style="margin:0">لم تُسجَّل مواقع عمل بعد. يضيفها مشرف الفريق لموقعه من تبويب «مواقع العمل».</p></div>';
+      '<p class="note" style="margin:0">لم تُسجَّل مواقع عمل بعد. يضيفها رئيس الفريق من صفحة «بدل الموقع».</p></div>';
   }
   return '<div class="field wide"><label>موقع العمل — اختر من الخريطة</label>'+
     '<div class="map-wrap" id="locMap">'+geoMap(locPoints(sel, Draft.gps), {pick:true, empty:"المواقع المسجّلة بلا إحداثيات — أضِفها من تبويب مواقع العمل"})+'</div>'+
@@ -3636,6 +3963,8 @@ function locPickerHTML(rec){
   '</div>';
 }
 function mountLocPicker(root){
+  /* لا توجد مواقع عمل مسجّلة بعد: لا خريطة ولا حقل موقع */
+  if(!$("#fLocId",root)) return;
   const wrap=$("#locMap",root);
   const info=$("#gpsInfo",root);
   const paint=()=>{
@@ -3724,7 +4053,7 @@ function supLocations(){
   };
 }
 function locationForm(loc){
-  if(!canManageAny() || (loc && !canManage(loc.site))){ toast("تسجيل مواقع العمل من صلاحية مشرف الفريق لموقعه"); return; }
+  if(!canManageAny() || (loc && !canManage(loc.site))){ toast("تسجيل مواقع العمل من صلاحية رئيس الفريق"); return; }
   const ms=manageSites();
   openModal({
     title: loc?"تعديل موقع عمل":"موقع عمل جديد",
@@ -3819,7 +4148,6 @@ function techMapCard(){
       '</div></div>'+
     '<div class="card-b"><div class="map-wrap">'+geoMap(pts.concat(gpsPts),{empty:"لا توجد مواقع أو نقاط GPS في هذا النطاق"})+'</div>'+
       '<div class="legend" style="padding:10px 0 0">'+
-        '<span><i style="background:var(--site-a)"></i>مواقع '+esc(SITES[0])+'</span>'+
         '<span><i style="background:var(--site-b)"></i>مواقع '+esc(SITES[1])+'</span>'+
         '<span><i style="background:var(--c2)"></i>نقاط GPS للأوامر</span>'+
       '</div></div></section>';
@@ -3940,11 +4268,10 @@ function viewPlaces(){
       '<section class="card"><div class="card-h"><h3>الخريطة</h3><span class="chip">'+fmt(pts.length)+' موقع</span></div>'+
         '<div class="card-b"><div class="map-wrap">'+geoMap(pts,{h:360, empty:"لا توجد مواقع بإحداثيات بعد"})+'</div>'+
         '<div class="legend" style="padding:10px 0 0">'+
-          '<span><i style="background:var(--site-a)"></i>'+esc(SITES[0])+'</span>'+
           '<span><i style="background:var(--site-b)"></i>'+esc(SITES[1])+'</span></div></div></section>'+
       '<section class="card" style="margin-top:14px"><div class="card-h"><h3>مواقع الأقسام</h3>'+
         '<span class="chip">'+fmt(assigned)+' محدد</span></div>'+
-        (mgr?'':'<div class="card-sub">للاطلاع — تحديد مواقع الأقسام من صلاحية مشرف الفريق للمركز الحكومي، وموظفي المبنى الرئيسي لمبناهم.</div>')+
+        (mgr?'':'<div class="card-sub">للاطلاع — تحديد مواقع الأقسام من صلاحية رئيس الفريق.</div>')+
         '<div class="card-b" style="padding-top:8px">'+deptTable+'</div></section>'+
       '<section class="card" style="margin-top:14px"><div class="card-h"><h3>مواقع العمل</h3><span class="chip">'+fmt(locs.length)+'</span></div>'+
         '<div class="card-b" style="padding-top:8px">'+locTable+'</div></section>',
@@ -3977,7 +4304,7 @@ function renderNav(){
     warehouse: lowStock().length,
     technicians: Store.list("technicians").length
   };
-  $("#navList").innerHTML=VIEWS.filter(v=>!v.only || (v.only==="chief" && Access.isChief()) || (v.only==="admin" && canManageAny())).map(v=>
+  $("#navList").innerHTML=VIEWS.filter(v=>Access.isChief() ? CHIEF_VIEWS.indexOf(v.k)>=0 : (!v.only || (v.only==="admin" && canManageAny()))).map(v=>
     '<button class="nav-b" data-view="'+v.k+'"'+(App.view===v.k?' aria-current="page"':'')+'>'+
       '<svg class="ic" viewBox="0 0 24 24">'+ICONS[v.k]+'</svg>'+esc(v.k==="supervisor"?managerTitle():v.t)+
       (counts[v.k]?'<span class="badge">'+fmt(counts[v.k])+'</span>':'')+
@@ -3987,6 +4314,8 @@ function renderNav(){
 function renderTop(){
   const top=$("#top");
   top.dataset.site=App.site;
+  const sw=$(".sites",top); if(sw) sw.hidden=true;
+  $("#newOrderBtn").hidden=Access.isChief();
   const allow=allowedSites();
   $$(".site-b",top).forEach(b=>{
     const k=b.dataset.k;
@@ -4056,31 +4385,21 @@ function renderGateInner(){
     g.innerHTML='<div class="gate-card">'+head+
       '<div class="gate-b">'+
         '<p class="note" style="margin:0">لم تُضبط كلمات السر بعد. اضبطها الآن مرة واحدة — بعدها لن يدخل أي موظف إلا بكلمة سر موقعه.</p>'+
-        pwField("sp1","كلمة سر "+SITES[0],{auto:"new-password", ph:"٤ أحرف على الأقل"})+
-        pwField("sp2","كلمة سر "+SITES[1],{auto:"new-password", ph:"٤ أحرف على الأقل"})+
-        '<div class="pick-sub-field">'+
-          pwField("sp3","كلمة سر مشرف الفريق — "+SITES[1]+" (اختيارية)",{auto:"new-password", ph:"يدير موظفي المركز الحكومي وقطع غياره",
-            hint:"مشرف الفريق تابع للمركز الحكومي ويرى بياناته وحده."})+
-        '</div>'+
-        pwField("sp4","كلمة سر رئيس القسم (اختيارية)",{auto:"new-password", ph:"يرى الموقعين وله لوحة خاصة للاعتماد",
-          hint:"لوحة رئيس القسم خاصة به وحده ولا تظهر لأي جهة أخرى."})+
+        pwField("sp2","كلمة سر "+SITES[1],{auto:"new-password", ph:"٤ أحرف على الأقل",
+          hint:"للموظفين: أوامر الصيانة والمخزن والموظفين والمواقع والإدارة."})+
+        pwField("sp4","كلمة سر رئيس الفريق",{auto:"new-password", ph:"٤ أحرف على الأقل",
+          hint:"رئيس الفريق يتابع التقارير الشهرية ويعدّلها فقط."})+
         '<div class="gate-err" id="gErr"></div>'+
         '<button class="btn pri" id="gSet" style="justify-content:center">حفظ وتفعيل الحماية</button>'+
       '</div>'+
       '<div class="gate-foot">تُحفظ كلمات السر مُجزَّأة (hash) في قاعدة البيانات، ولا تُخزَّن كنص صريح.</div></div>';
     const err=m=>{ const e=$("#gErr"); e.textContent=m; e.classList.add("on"); };
     $("#gSet").onclick=async()=>{
-      const a=$("#sp1").value, b=$("#sp2").value, c=$("#sp3").value, d=$("#sp4").value;
-      if(a.length<4||b.length<4){ err("كلمتا سر الموقعين مطلوبتان، و٤ أحرف على الأقل لكل منهما."); return; }
-      if(a===b){ err("يجب أن تختلف كلمة سر المبنى الرئيسي عن كلمة سر المركز الحكومي."); return; }
-      if(c && c.length<4){ err("كلمة سر المشرف يجب ألا تقل عن ٤ أحرف."); return; }
-      if(d && d.length<4){ err("كلمة سر رئيس القسم يجب ألا تقل عن ٤ أحرف."); return; }
-      if(d && (d===a||d===b||d===c)){ err("يجب أن تختلف كلمة سر رئيس القسم عن باقي كلمات السر."); return; }
+      const b=$("#sp2").value, d=$("#sp4").value;
+      if(b.length<4||d.length<4){ err("كلمتا السر مطلوبتان، و٤ أحرف على الأقل لكل منهما."); return; }
+      if(b===d){ err("يجب أن تختلف كلمة سر رئيس الفريق عن كلمة سر المركز الحكومي."); return; }
       $("#gSet").disabled=true;
-      const pairs=[[SITES[0],a],[SITES[1],b]];
-      if(d) pairs.push([CHIEF_KEY,d]);
-      if(c) pairs.push([ADMIN_KEY,c]);
-      await Access.setMany(pairs);
+      await Access.setMany([[SITES[1],b],[CHIEF_KEY,d]]);
       toast("تم تفعيل الحماية");
       renderGate();
     };
@@ -4090,10 +4409,8 @@ function renderGateInner(){
   /* شاشة الدخول */
   const isSet = k => Access.auth() || !!Access.entries()[k];
   const opts=[
-    {k:SITES[0],  nm:SITES[0],       ds:"سجلات ومخزن وتقارير المبنى الرئيسي فقط"},
-    {k:SITES[1],  nm:SITES[1],       ds:"سجلات ومخزن وتقارير المركز الحكومي فقط"},
-    {k:CHIEF_KEY, nm:"رئيس القسم",   ds:"لوحة خاصة للمتابعة واعتماد الأوامر في الموقعين"},
-    {k:ADMIN_KEY, nm:"مشرف الفريق",  ds:"مشرف المركز الحكومي — موظفوه وقطع غياره وكلمات سره", parent:SITES[1]}
+    {k:SITES[1],  nm:SITES[1],      ds:"أوامر الصيانة والمخزن والتقارير"},
+    {k:CHIEF_KEY, nm:"رئيس الفريق", ds:"التقارير، وإضافة الفنيين، وبدل الموقع، وإدارة المركز"}
   ];
   if(!gatePick || !opts.some(o=>o.k===gatePick)) gatePick=opts[0].k;
   const picked=opts.find(o=>o.k===gatePick);
@@ -4125,8 +4442,8 @@ function renderGateInner(){
       '<button class="btn pri" id="gIn" style="justify-content:center">'+(first?"ضبط كلمة السر والدخول":"دخول")+'</button>'+
     '</div>'+
     '<div class="gate-foot">'+(Access.auth()
-      ? 'الدخول بحسابات Firebase — كل جهة ترى قاعدة موقعها فقط، والحماية مطبّقة على الخادم.'
-      : 'كل جهة ترى بياناتها فقط، وتغيّر كلمة سرها من صفحة الإعدادات. مشرف الفريق يعيد ضبط كلمة سر المركز الحكومي.')+'</div></div>';
+      ? 'الدخول بحسابات Firebase — والحماية مطبّقة على الخادم.'
+      : 'رئيس الفريق يضبط كلمتَي السر ويغيّرهما من صفحة «إدارة المركز».')+'</div></div>';
 
   $$(".pick",g).forEach(b=>b.onclick=()=>{ gatePick=b.dataset.k; renderGate(); });
 
@@ -4196,10 +4513,11 @@ function render(){
   const g=$("#gate"); if(g) g.hidden=true;
   $(".app").hidden=false;
   if(!Access.bothSites() && App.site!==homeSite()) App.site=homeSite();
-  /* تُفتح قاعدة موقع الجهة وحدها — والقاعدتان لرئيس القسم */
+  /* تُفتح قاعدة المركز الحكومي وحدها */
   Store.openSites(allowedSites());
-  if(App.view==="chief" && !Access.isChief()) App.view="dashboard";
+  if(["chief","settings","places"].indexOf(App.view)>=0 && !Access.isChief()) App.view="dashboard";
   if(App.view==="supervisor" && !canManageAny()) App.view="dashboard";
+  if(Access.isChief() && CHIEF_VIEWS.indexOf(App.view)<0) App.view="chief";
   renderNav(); renderTop();
   const page=$("#page");
   const v=(VIEW_FN[App.view]||viewDashboard)();
@@ -4261,3 +4579,6 @@ Store.on(onStoreChange);
 Store.init().then(()=>{ onStoreChange(); });
 })();
 </script>
+
+
+
