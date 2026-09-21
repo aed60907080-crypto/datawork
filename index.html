@@ -409,6 +409,11 @@ table.tbl .r{text-align:end}
             <svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9zM14 3v6h6M9 12l5 6M14 12l-5 6"/></svg>
             <span class="lbl">حفظ Excel</span>
           </button>
+          <button class="btn" id="xlOpenBtn" title="فتح البيانات من ملف Excel محفوظ" aria-label="فتح من Excel">
+            <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5-5 5 5M12 5v12"/></svg>
+            <span class="lbl">فتح من Excel</span>
+          </button>
+          <input type="file" id="xlOpenFile" accept=".xlsx,.json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/json" hidden>
           <button class="btn pri" id="newOrderBtn">
             <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
             أمر صيانة جديد
@@ -640,8 +645,8 @@ table.tbl tbody tr.unread td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
   .top-in{padding:8px 12px; gap:8px}
   .top-title{font-size:14px}
   #newOrderBtn{padding:8px 11px}
-  #xlSaveBtn{padding:8px 10px}
-  #xlSaveBtn .lbl{display:none}
+  #xlSaveBtn, #xlOpenBtn{padding:8px 10px}
+  #xlSaveBtn .lbl, #xlOpenBtn .lbl{display:none}
   .page{padding:12px}
   .page-head{margin-bottom:12px}
   .page-head h2{font-size:19px}
@@ -4612,6 +4617,8 @@ $$(".site-b").forEach(b=>b.onclick=()=>{
 });
 $("#newOrderBtn").onclick=()=>{ App.params={}; go("neworder"); };
 $("#xlSaveBtn").onclick=()=>saveAllExcel();
+$("#xlOpenBtn").onclick=()=>$("#xlOpenFile").click();
+$("#xlOpenFile").onchange=e=>{ const f=e.target.files[0]; e.target.value=""; openBackupFile(f); };
 /* التثبيت كتطبيق على الهاتف أو الحاسب (يعمل من رابط GitHub Pages) */
 let installEvt=null;
 window.addEventListener("beforeinstallprompt",e=>{ e.preventDefault(); installEvt=e; $("#installBtn").hidden=false; });
