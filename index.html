@@ -405,6 +405,10 @@ table.tbl .r{text-align:end}
             تثبيت التطبيق
           </button>
           <div id="whoBox" style="display:flex;align-items:center;gap:8px"></div>
+          <button class="btn" id="xlSaveBtn" title="حفظ كل البيانات في ملف Excel" aria-label="حفظ Excel">
+            <svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9zM14 3v6h6M9 12l5 6M14 12l-5 6"/></svg>
+            <span class="lbl">حفظ Excel</span>
+          </button>
           <button class="btn pri" id="newOrderBtn">
             <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
             أمر صيانة جديد
@@ -636,6 +640,8 @@ table.tbl tbody tr.unread td:first-child{box-shadow:inset 3px 0 0 var(--warn)}
   .top-in{padding:8px 12px; gap:8px}
   .top-title{font-size:14px}
   #newOrderBtn{padding:8px 11px}
+  #xlSaveBtn{padding:8px 10px}
+  #xlSaveBtn .lbl{display:none}
   .page{padding:12px}
   .page-head{margin-bottom:12px}
   .page-head h2{font-size:19px}
@@ -3356,6 +3362,103 @@ function securityNote(){
   'للحماية على مستوى الخادم استخدم نسخة Firebase.</p>';
 }
 
+/* ============================================================
+   حفظ كل البيانات في ملف Excel واحد، وفتحها منه على أي جهاز
+   الملف فيه أوراق منسّقة للقراءة والطباعة، وورقة مخفية «_بيانات_النظام»
+   تحمل نسخة كاملة من البيانات تُستعاد بها عند «فتح من Excel».
+   ============================================================ */
+const XL_DATA_SHEET="_بيانات_النظام";
+function backupData(){
+  const allow=allowedSites();
+  const data={app:"mpw-maintenance", v:1, exportedAt:new Date().toISOString(), scope:Access.label(),
+    config:Store.config, chiefName:((Store.access||{}).chiefName||"")};
+  COLS.forEach(c2=>{
+    data[c2] = (c2==="technicians")
+      ? Store.list(c2).filter(t=>Access.bothSites()||!t.site||t.site==="كلا الموقعين"||allow.indexOf(t.site)>=0)
+      : Store.list(c2).filter(r=>Access.bothSites()||!r.site||allow.indexOf(r.site)>=0);
+  });
+  return data;
+}
+function saveAllExcel(){
+  return xlRun("البيانات", async wb=>{
+    const recs=siteFilter(Store.list("records"));
+    xlRecordsSheet(wb, "سجل الصيانة", "سجل صيانة الأجهزة — كامل", recs);
+    xlSummarySheet(wb, "ملخص", "ملخص عام", xlSub(fmt(recs.length)+" أمر"), recs);
+    xlPartsSheet(wb, siteFilter(Store.list("parts")));
+    xlMovesSheet(wb, siteFilter(Store.list("movements")));
+    const techs=Store.list("technicians");
+    xlSheetTable(wb,{name:"الفنيون", title:"الفنيون", sub:xlSub(fmt(techs.length)+" فني"), tab:"FF4257C8",
+      columns:[{h:"الاسم",bold:true},{h:"التخصص"},{h:"الهاتف",center:true},{h:"الحالة",center:true,tone:r=>r[3]==="نشط"?XL.tone.ok:XL.tone.none},
+        {h:"إجمالي الأوامر",num:true,sum:true},{h:"منجزة",num:true,sum:true}],
+      rows:techs.map(t=>{ const rs=recs.filter(r=>r.tech===t.name);
+        return [t.name||"", t.specialty||"", t.phone||"", t.active===false?"غير نشط":"نشط", rs.length, rs.filter(r=>r.status==="منجز").length]; }),
+      totals:techs.length>1});
+    const emps=Store.list("employees");
+    xlSheetTable(wb,{name:"الموظفون", title:"سجل الموظفين", sub:xlSub(fmt(emps.length)+" موظف"), tab:"FF4257C8",
+      columns:[{h:"الاسم",bold:true},{h:"الرقم الوظيفي",center:true},{h:"القطاع"},{h:"القسم"},{h:"الطابق",center:true},{h:"الهاتف",center:true},{h:"أوامر الصيانة",num:true}],
+      rows:emps.map(e=>[e.name||"", e.jobNo||"", e.sector||"", e.dept||"", e.floor||"", e.phone||"", recs.filter(r=>r.employee===e.name).length])});
+    const locs=scopedLocations();
+    xlSheetTable(wb,{name:"مواقع العمل", title:"مواقع العمل", sub:xlSub(fmt(locs.length)+" موقع"), tab:"FF8B3BAE",
+      columns:[{h:"الموقع",bold:true},{h:"الأقسام فيه",wrap:true,w:30},{h:"خط العرض",center:true,w:12},{h:"خط الطول",center:true,w:12},{h:"نطاق الحضور (م)",num:true},{h:"الأوامر",num:true},{h:"ملاحظة",wrap:true,w:30}],
+      rows:locs.map(l=>[l.name||"", deptsAt(l.id).join("، "), isFinite(n(l.lat))&&n(l.lat)!==0?fmtCoord(n(l.lat)):"", isFinite(n(l.lng))&&n(l.lng)!==0?fmtCoord(n(l.lng)):"",
+        n(l.radius||200), recs.filter(r=>r.locId===l.id).length, l.note||""])});
+    /* نسخة البيانات الكاملة — مقسّمة لأن الخلية لا تتسع لأكثر من 32767 حرفاً */
+    const json=JSON.stringify(backupData());
+    const ds=wb.addWorksheet(XL_DATA_SHEET);
+    for(let i=0, r=1; i<json.length; i+=30000, r++) ds.getCell(r,1).value=json.slice(i,i+30000);
+    ds.state="veryHidden";
+    return "بيانات-صيانة-الأجهزة-"+today()+".xlsx";
+  });
+}
+/* قراءة ملف محفوظ من النظام: Excel (بورقة البيانات المخفية) أو نسخة JSON */
+async function readBackupFile(f){
+  if(/\.json$/i.test(f.name)) return JSON.parse(await f.text());
+  const ExcelJS=await xlsxLib();
+  const wb=new ExcelJS.Workbook();
+  await wb.xlsx.load(await f.arrayBuffer());
+  const ws=wb.getWorksheet(XL_DATA_SHEET);
+  if(!ws) throw new Error("no-data-sheet");
+  let json="";
+  ws.eachRow({includeEmpty:false}, row=>{
+    const v=row.getCell(1).value;
+    json += (v && v.richText) ? v.richText.map(t=>t.text).join("") : String(v==null?"":v);
+  });
+  return JSON.parse(json);
+}
+/* دمج البيانات: السجل الموجود يُحدَّث، والجديد يُضاف، ولا يُحذف شيء */
+function importBackup(data){
+  const rows=[];
+  COLS.forEach(c2=>(data[c2]||[]).forEach(row=>{
+    if(!row || !row.id) return;
+    if(row.site && row.site!=="كلا الموقعين" && allowedSites().indexOf(row.site)<0) return;
+    if(c2!=="technicians" && allowedSites().indexOf(row.site)<0) return;
+    rows.push([c2,row]);
+  }));
+  const fresh=rows.filter(([c2,row])=>!byId(Store.list(c2),row.id)).length;
+  confirmBox("فتح البيانات من الملف",
+    "في الملف "+fmt(rows.length)+" سجلاً: "+fmt(fresh)+" جديد تُضاف، و"+fmt(rows.length-fresh)+" موجود يُحدَّث بنسخة الملف. لا يُحذف أي شيء.",
+    async()=>{
+      toast("جارٍ فتح البيانات…");
+      try{
+        for(const [c2,row] of rows) await Store.save(c2,row);
+        if(data.config) await Store.saveConfig(Object.assign({},Store.config,data.config));
+        if(data.chiefName && data.chiefName!==((Store.access||{}).chiefName||""))
+          await Store.saveAccess(Object.assign({},Store.access,{chiefName:data.chiefName}));
+        toast("تم فتح "+fmt(rows.length)+" سجلاً من الملف"); render();
+      }catch(e){ console.error(e); toast("تعذّر حفظ بعض البيانات — حاول مرة أخرى"); }
+    },"فتح البيانات");
+}
+async function openBackupFile(f){
+  if(!f) return;
+  try{ importBackup(await readBackupFile(f)); }
+  catch(e){
+    console.warn(e);
+    toast(e && e.message==="no-data-sheet"
+      ? "هذا الملف لم يُحفظ من النظام — افتح ملفاً حُفظ بزر «حفظ Excel»"
+      : "تعذّر قراءة الملف — تأكد أنه ملف Excel حُفظ من النظام");
+  }
+}
+
 function viewSettings(){
   const c=Store.config;
   const admin=Access.isChief();
@@ -3397,12 +3500,15 @@ function viewSettings(){
           kv("الفنيون",fmt(Store.list("technicians").filter(t=>Access.bothSites()||!t.site||t.site==="كلا الموقعين"||allowedSites().indexOf(t.site)>=0).length))+
         '</dl>'+
         '<div style="display:flex;gap:9px;flex-wrap:wrap">'+
-          '<button class="btn pri" id="expXlsx"><svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9zM14 3v6h6M9 12l5 6M14 12l-5 6"/></svg>تصدير كل البيانات إلى Excel</button>'+
-          '<button class="btn" id="expAll">تصدير نسخة احتياطية (JSON)</button>'+
-          (admin?'<button class="btn" id="impAll">استيراد نسخة</button><input type="file" accept="application/json,.json" id="impFile" hidden>':'')+
+          '<button class="btn pri" id="expXlsx"><svg viewBox="0 0 24 24"><path d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9zM14 3v6h6M9 12l5 6M14 12l-5 6"/></svg>حفظ Excel — كل البيانات</button>'+
+          '<button class="btn" id="impAll"><svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5-5 5 5M12 5v12"/></svg>فتح من Excel</button>'+
+          '<input type="file" accept=".xlsx,.json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/json" id="impFile" hidden>'+
+          '<button class="btn ghost" id="expAll">نسخة احتياطية (JSON)</button>'+
         '</div>'+
-        '<p class="note" style="margin-top:14px">النسخة الاحتياطية تشمل ما تملك صلاحية رؤيته من السجلات والمخزن والحركات والفنيين والموظفين، مع القوائم. صور السيريال لا تُدرج لأنها كبيرة الحجم.'+
-          (admin?'':' الاستيراد من صلاحية رئيس الفريق.')+'</p>'+
+        '<p class="note" style="margin-top:14px">«حفظ Excel» ينشئ ملفاً واحداً فيه كل السجلات والمخزن والحركات والفنيين والموظفين ومواقع العمل مع القوائم. '+
+          'افتح الملف نفسه بزر «فتح من Excel» على أي جهاز أو متصفح لنقل البيانات إليه: الجديد يُضاف والموجود يُحدَّث، ولا يُحذف شيء. '+
+          'صور السيريال لا تُدرج لأنها كبيرة الحجم.'+
+          (Store.mode==="local"?' <b>هذا الجهاز يحفظ بياناته لنفسه فقط — احفظ ملف Excel بانتظام.</b>':'')+'</p>'+
       '</div></section>'+
 
       (admin && !Access.auth()
@@ -3455,59 +3561,10 @@ function viewSettings(){
         if(msg){ e.textContent=msg; e.classList.add("on"); save1.disabled=false; return; }
         toast("تم تغيير كلمة السر"); render();
       };
-      $("#expXlsx",root).onclick=()=>xlRun("البيانات", async wb=>{
-        const recs=siteFilter(Store.list("records"));
-        xlRecordsSheet(wb, "سجل الصيانة", "سجل صيانة الأجهزة — كامل", recs);
-        xlSummarySheet(wb, "ملخص", "ملخص عام", xlSub(fmt(recs.length)+" أمر"), recs);
-        xlPartsSheet(wb, siteFilter(Store.list("parts")));
-        xlMovesSheet(wb, siteFilter(Store.list("movements")));
-        const techs=Store.list("technicians");
-        xlSheetTable(wb,{name:"الفنيون", title:"الفنيون", sub:xlSub(fmt(techs.length)+" فني"), tab:"FF4257C8",
-          columns:[{h:"الاسم",bold:true},{h:"التخصص"},{h:"الهاتف",center:true},{h:"الحالة",center:true,tone:r=>r[3]==="نشط"?XL.tone.ok:XL.tone.none},
-            {h:"إجمالي الأوامر",num:true,sum:true},{h:"منجزة",num:true,sum:true}],
-          rows:techs.map(t=>{ const rs=recs.filter(r=>r.tech===t.name);
-            return [t.name||"", t.specialty||"", t.phone||"", t.active===false?"غير نشط":"نشط", rs.length, rs.filter(r=>r.status==="منجز").length]; }),
-          totals:techs.length>1});
-        const emps=Store.list("employees");
-        xlSheetTable(wb,{name:"الموظفون", title:"سجل الموظفين", sub:xlSub(fmt(emps.length)+" موظف"), tab:"FF4257C8",
-          columns:[{h:"الاسم",bold:true},{h:"الرقم الوظيفي",center:true},{h:"القطاع"},{h:"القسم"},{h:"الطابق",center:true},{h:"الهاتف",center:true},{h:"أوامر الصيانة",num:true}],
-          rows:emps.map(e=>[e.name||"", e.jobNo||"", e.sector||"", e.dept||"", e.floor||"", e.phone||"", recs.filter(r=>r.employee===e.name).length])});
-        const locs=scopedLocations();
-        xlSheetTable(wb,{name:"مواقع العمل", title:"مواقع العمل", sub:xlSub(fmt(locs.length)+" موقع"), tab:"FF8B3BAE",
-          columns:[{h:"الموقع",bold:true},{h:"الأقسام فيه",wrap:true,w:30},{h:"خط العرض",center:true,w:12},{h:"خط الطول",center:true,w:12},{h:"نطاق الحضور (م)",num:true},{h:"الأوامر",num:true},{h:"ملاحظة",wrap:true,w:30}],
-          rows:locs.map(l=>[l.name||"", deptsAt(l.id).join("، "), isFinite(n(l.lat))&&n(l.lat)!==0?fmtCoord(n(l.lat)):"", isFinite(n(l.lng))&&n(l.lng)!==0?fmtCoord(n(l.lng)):"",
-            n(l.radius||200), recs.filter(r=>r.locId===l.id).length, l.note||""])});
-        return "بيانات-صيانة-الأجهزة-"+today()+".xlsx";
-      });
-      $("#expAll",root).onclick=()=>{
-        const allow=allowedSites();
-        const data={exportedAt:new Date().toISOString(), scope:Access.label(), config:Store.config};
-        COLS.forEach(c2=>{
-          data[c2] = (c2==="technicians")
-            ? Store.list(c2).filter(t=>Access.bothSites()||!t.site||t.site==="كلا الموقعين"||allow.indexOf(t.site)>=0)
-            : Store.list(c2).filter(r=>Access.bothSites()||!r.site||allow.indexOf(r.site)>=0);
-        });
-        download("نسخة-احتياطية-"+today()+".json", JSON.stringify(data,null,2), "application/json");
-      };
-      const imp=$("#impAll",root);
-      if(imp){
-        imp.onclick=()=>$("#impFile",root).click();
-        $("#impFile",root).onchange=async e=>{
-          const f=e.target.files[0]; if(!f) return;
-          try{
-            const data=JSON.parse(await f.text());
-            confirmBox("استيراد البيانات","سيُضاف "+COLS.reduce((s,c2)=>s+((data[c2]||[]).length),0)+" سجلاً إلى البيانات الحالية.",async()=>{
-              for(const c2 of COLS){ for(const row of (data[c2]||[])){
-                if(row.site && row.site!=="كلا الموقعين" && allowedSites().indexOf(row.site)<0) continue;
-                if(c2!=="technicians" && allowedSites().indexOf(row.site)<0) continue;
-                await Store.save(c2,row);
-              } }
-              if(data.config) await Store.saveConfig(Object.assign({},Store.config,data.config));
-              toast("تم الاستيراد"); render();
-            },"استيراد");
-          }catch(err){ toast("ملف غير صالح"); }
-        };
-      }
+      $("#expXlsx",root).onclick=()=>saveAllExcel();
+      $("#expAll",root).onclick=()=>download("نسخة-احتياطية-"+today()+".json", JSON.stringify(backupData(),null,2), "application/json");
+      $("#impAll",root).onclick=()=>$("#impFile",root).click();
+      $("#impFile",root).onchange=e=>{ const f=e.target.files[0]; e.target.value=""; openBackupFile(f); };
     }
   };
 }
@@ -4554,6 +4611,7 @@ $$(".site-b").forEach(b=>b.onclick=()=>{
   App.params={}; render();
 });
 $("#newOrderBtn").onclick=()=>{ App.params={}; go("neworder"); };
+$("#xlSaveBtn").onclick=()=>saveAllExcel();
 /* التثبيت كتطبيق على الهاتف أو الحاسب (يعمل من رابط GitHub Pages) */
 let installEvt=null;
 window.addEventListener("beforeinstallprompt",e=>{ e.preventDefault(); installEvt=e; $("#installBtn").hidden=false; });
