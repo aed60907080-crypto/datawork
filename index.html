@@ -2233,6 +2233,15 @@ async function openRecord(id){
   const body=
     '<div class="pill-row"><span class="chip '+siteClass(r.site)+'">'+esc(r.site)+'</span>'+statusChip(r.status)+
       '<span class="chip">'+esc(r.mtype||"—")+'</span><span class="chip mono">'+esc(r.date)+'</span></div>'+
+    /* تغيير حالة الأمر من صلاحية رئيس الفريق وحده */
+    (Access.isChief()
+      ? '<div class="note" style="margin-bottom:12px"><b>حالة الأمر</b>'+
+        '<div style="display:flex;gap:9px;align-items:flex-end;flex-wrap:wrap;margin-top:8px">'+
+          '<div class="field" style="min-width:190px"><label for="recStatus">الحالة</label>'+
+            '<select class="inp" id="recStatus">'+optionsHTML(STATUSES, r.status||"مفتوح")+'</select></div>'+
+          '<button class="btn pri" id="recStatusSave">حفظ الحالة</button>'+
+        '</div></div>'
+      : '')+
     '<div class="detail-grid">'+
       '<div>'+
         '<div class="sub-head">الجهاز</div>'+
@@ -2276,6 +2285,16 @@ async function openRecord(id){
       [{label:"إغلاق", cls:"btn pri", act:closeModal}]
     ),
     async onMount(root){
+      const ss=$("#recStatusSave",root);
+      if(ss) ss.onclick=async()=>{
+        const v=$("#recStatus",root).value;
+        if(v===r.status){ toast("الحالة كما هي"); return; }
+        ss.disabled=true;
+        try{
+          await Store.save("records", Object.assign({},r,{status:v}));
+          closeModal(); toast("صارت حالة "+(r.no||"الأمر")+": "+v); render();
+        }catch(e){ console.error(e); ss.disabled=false; toast("تعذّر حفظ الحالة"); }
+      };
       if(!r.photoId) return;
       const url=await Store.getPhoto(r.site,r.photoId);
       const slot=$("#recPhoto",root); if(!slot) return;
@@ -2346,7 +2365,9 @@ function viewNewOrder(){
       '<div class="field"><label for="fTech">اسم الفني (مطلوب)</label><input class="inp" id="fTech" list="techList" required value="'+esc(rec?rec.tech:"")+'" placeholder="اختر أو اكتب الاسم">'+
         '<datalist id="techList">'+techNames.map(t=>'<option value="'+esc(t)+'"></option>').join("")+'</datalist></div>'+
       '<div class="field"><label for="fMtype">نوع الصيانة (مطلوب)</label><select class="inp" id="fMtype" required>'+optionsHTML(c.mtypes, rec?rec.mtype:"", "اختر نوع الصيانة")+'</select></div>'+
-      '<div class="field"><label for="fStatus">الحالة</label><select class="inp" id="fStatus">'+optionsHTML(STATUSES, rec?rec.status:"منجز")+'</select></div>'+
+      /* الحالة بيد رئيس الفريق وحده — تُعرض هنا للاطلاع فقط */
+      '<div class="field"><label>الحالة</label><input class="inp" value="'+esc(rec?(rec.status||"مفتوح"):"مفتوح")+'" readonly>'+
+        '<span class="hint">يبدأ الأمر «مفتوح»، ويغيّر حالته رئيس الفريق بعد مراجعته.</span></div>'+
       '<div class="field wide"><label>قطع الغيار المستخدمة</label><div id="partsBox"></div>'+
         '<span class="hint">تُخصم الكمية من مخزن الموقع تلقائياً وتُسجَّل حركة صرف باسم الفني.</span></div>'+
       '<div class="field wide"><label for="fNotes">ملاحظات</label><textarea class="inp" id="fNotes" placeholder="وصف العطل، الإجراء المتخذ، التوصيات…">'+esc(rec?rec.notes:"")+'</textarea></div>'+
@@ -2434,7 +2455,9 @@ async function saveOrder(rec){
     site:site, date:date,
     employee:g("fEmp"), sector:g("fSector"), dept:g("fDept"), floor:g("fFloor"),
     devType:g("fDev"), devModel:g("fModel"), serial:g("fSerial"), tag:g("fTag"),
-    tech:g("fTech"), chief: rec?(rec.chief||""):"", mtype:g("fMtype"), status:g("fStatus"), notes:g("fNotes"),
+    tech:g("fTech"), chief: rec?(rec.chief||""):"", mtype:g("fMtype"),
+    status: rec ? (rec.status||"مفتوح") : "مفتوح", /* الحالة لا تتغيّر من المركز الحكومي */
+    notes:g("fNotes"),
     locId:g("fLocId"),
     locName:(byId(Store.list("locations"),g("fLocId"))||{}).name || (rec?(rec.locName||""):""),
     gps: Draft.gps || (rec?(rec.gps||null):null),
