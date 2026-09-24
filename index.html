@@ -1688,12 +1688,11 @@ function xlDT(ts){
 function xlPartsSheet(wb, parts){
   const st=p=>n(p.qty)<=0?"نفد":(n(p.qty)<=n(p.minQty)?"تحت الحد":"سليم");
   const rows=parts.slice().sort((a,b)=>String(a.name).localeCompare(String(b.name),"ar"))
-    .map(p=>[p.name||"", p.code||"", p.category||"", p.store||"", n(p.qty), n(p.minQty), p.unit||"حبة", n(p.price), n(p.qty)*n(p.price), st(p)]);
+    .map(p=>[p.name||"", p.code||"", p.category||"", p.store||"", n(p.qty), n(p.minQty), st(p)]);
   return xlSheetTable(wb,{name:"الأصناف", title:"مخزن قطع الغيار — الأصناف", sub:xlSub(fmt(rows.length)+" صنف"), freezeCols:1,
     columns:[{h:"الصنف",bold:true},{h:"الرمز",center:true},{h:"الفئة"},{h:"المخزن / الرف"},
-      {h:"المتوفر",num:true,sum:true,w:11},{h:"الحد الأدنى",num:true,w:11},{h:"الوحدة",center:true,w:9},
-      {h:"سعر الوحدة (د.ك)",money:true,w:15},{h:"القيمة (د.ك)",money:true,sum:true,w:15},
-      {h:"حالة المخزون",center:true,w:14,tone:r=>r[9]==="نفد"?XL.tone.crit:(r[9]==="تحت الحد"?XL.tone.warn:XL.tone.ok)}],
+      {h:"المتوفر",num:true,sum:true,w:11},{h:"الحد الأدنى",num:true,w:11},
+      {h:"حالة المخزون",center:true,w:14,tone:r=>r[6]==="نفد"?XL.tone.crit:(r[6]==="تحت الحد"?XL.tone.warn:XL.tone.ok)}],
     rows:rows, totals:rows.length>0});
 }
 function xlMovesSheet(wb, mv){
@@ -1729,7 +1728,7 @@ const VIEWS = [
   {k:"dashboard",   t:"لوحة المتابعة"},
   {k:"neworder",    t:"أمر صيانة جديد"},
   {k:"records",     t:"سجل الصيانة"},
-  {k:"warehouse",   t:"مخزن قطع الغيار"},
+  {k:"warehouse",   t:"مخزن قطع الغيار", only:"chief"},
   {k:"technicians", t:"الفنيون وسجلاتهم"},
   {k:"reports",     t:"التقارير الشهرية"},
   {k:"settings",    t:"الإعدادات", only:"chief"},
@@ -2088,7 +2087,7 @@ function viewDashboard(){
     tile("منجزة هذا الشهر", fmt(doneM.length), thisM.length?Math.round(doneM.length/thisM.length*100)+"% من أوامر الشهر":"—")+
 
     tile("أجهزة مسجّلة", fmt(devices), "حسب رقم السيريال")+
-    tile("أصناف تحت الحد الأدنى", fmt(low.length), low.length?"راجع المخزن":"المخزون سليم", low.length?"crit":"ok")+
+    (Access.isChief() ? tile("أصناف تحت الحد الأدنى", fmt(low.length), low.length?"راجع المخزن":"المخزون سليم", low.length?"crit":"ok") : "")+
    '</div>';
 
   const years=[];
@@ -2134,7 +2133,8 @@ function viewDashboard(){
     '<div class="card-h"><h3>آخر أوامر الصيانة</h3><div class="sp"><button class="btn ghost sm" data-go="records">عرض السجل كاملاً ←</button></div></div>'+
     '<div class="card-b" style="padding-top:8px">'+ recordsTable(latestRows) +'</div></section>';
 
-  const alerts= low.length ? '<section class="card" style="margin-top:14px">'+
+  /* المخزن من صلاحية رئيس الفريق، فلا تظهر تنبيهاته لغيره */
+  const alerts= (low.length && Access.isChief()) ? '<section class="card" style="margin-top:14px">'+
     '<div class="card-h"><h3>تنبيهات المخزون</h3><span class="chip crit"><i></i>'+fmt(low.length)+' صنف</span><div class="sp"><button class="btn ghost sm" data-go="warehouse">فتح المخزن ←</button></div></div>'+
     '<div class="card-b" style="padding-top:8px"><div class="tbl-wrap"><table class="tbl"><thead><tr>'+
     '<th>الصنف</th><th>الرمز</th><th>الموقع</th><th class="r">المتوفر</th><th class="r">الحد الأدنى</th></tr></thead><tbody>'+
@@ -2560,7 +2560,6 @@ function viewWarehouse(){
   }).sort((a,b)=>String(a.name).localeCompare(String(b.name),"ar"));
   const low=all.filter(p=>n(p.qty)<=n(p.minQty));
   const totalQty=all.reduce((s,p)=>s+n(p.qty),0);
-  const value=all.reduce((s,p)=>s+n(p.qty)*n(p.price),0);
   const movs=siteFilter(Store.list("movements")).slice(0,25);
 
   return {
@@ -2576,7 +2575,6 @@ function viewWarehouse(){
       tile("عدد الأصناف", fmt(all.length), App.site==="الكل"?"في الموقعين":"في "+App.site)+
       tile("إجمالي القطع", fmt(totalQty), "مجموع الكميات المتوفرة")+
       tile("تحت الحد الأدنى", fmt(low.length), low.length?"يلزم توريد":"المخزون سليم", low.length?"crit":"ok")+
-      tile("القيمة التقديرية", fmt(Math.round(value)), "د.ك — حسب سعر الوحدة المسجّل")+
     '</div>'+
     '<div class="filters">'+
       '<div class="field grow"><label for="wq">بحث</label><input class="inp" id="wq" placeholder="اسم الصنف أو الرمز…" value="'+esc(WH.q)+'"></div>'+
@@ -2585,7 +2583,7 @@ function viewWarehouse(){
     '</div>'+
     '<section class="card"><div class="card-h"><h3>الأصناف</h3><span class="chip">'+fmt(parts.length)+' صنف</span></div><div class="card-b" style="padding-top:8px">'+
       (parts.length? '<div class="tbl-wrap"><table class="tbl"><thead><tr>'+
-        '<th>الصنف</th><th>الرمز</th><th>الفئة</th><th>المخزن</th><th class="r">المتوفر</th><th class="r">الحد الأدنى</th><th>الوحدة</th><th></th></tr></thead><tbody>'+
+        '<th>الصنف</th><th>الرمز</th><th>الفئة</th><th>المخزن</th><th class="r">المتوفر</th><th class="r">الحد الأدنى</th><th></th></tr></thead><tbody>'+
         parts.map(p=>{
           const q=n(p.qty), low=q<=n(p.minQty);
           return '<tr class="stripe '+siteClass(p.site)+'">'+
@@ -2593,10 +2591,9 @@ function viewWarehouse(){
             '<td class="mono">'+esc(p.code||"—")+'</td><td>'+esc(p.category||"—")+'</td>'+
             '<td><span class="chip '+siteClass(p.site)+'">'+esc(p.site)+'</span>'+(p.store?'<div style="font-size:11px;color:var(--ink-3)">'+esc(p.store)+'</div>':'')+'</td>'+
             '<td class="r num'+(q<=0?" qty-neg":(low?" qty-low":""))+'" style="font-weight:700">'+fmt(q)+'</td>'+
-            '<td class="r num">'+fmt(p.minQty)+'</td><td>'+esc(p.unit||"حبة")+'</td>'+
+            '<td class="r num">'+fmt(p.minQty)+'</td>'+
             '<td class="r" style="white-space:nowrap">'+
-              (canManage(p.site)?'<button class="btn sm" data-mov-in="'+esc(p.id)+'">إدخال</button> '+
-              '<button class="btn sm" data-mov-out="'+esc(p.id)+'">صرف</button> ':'')+
+              (canManage(p.site)?'<button class="btn sm" data-mov-out="'+esc(p.id)+'">صرف</button> ':'')+
               (canManage(p.site)?'<button class="btn sm ghost" data-edit-part="'+esc(p.id)+'">تعديل</button>':'')+
             '</td></tr>';
         }).join("")+'</tbody></table></div>'
@@ -2618,7 +2615,6 @@ function viewWarehouse(){
       $("#wclear",root).onclick=()=>{ WH.q=""; WH.cat=""; render(); };
       const apb=$("#addPartBtn",root); if(apb) apb.onclick=()=>partForm(null);
       $$("[data-edit-part]",root).forEach(b=>b.onclick=()=>partForm(byId(Store.list("parts"),b.dataset.editPart)));
-      $$("[data-mov-in]",root).forEach(b=>b.onclick=()=>movForm(byId(Store.list("parts"),b.dataset.movIn),"إدخال"));
       $$("[data-mov-out]",root).forEach(b=>b.onclick=()=>movForm(byId(Store.list("parts"),b.dataset.movOut),"صرف"));
       $("#expParts",root).onclick=()=>xlRun("المخزن", async wb=>{
         xlPartsSheet(wb, parts);
@@ -2641,8 +2637,6 @@ function partForm(p){
       '<div class="field"><label for="pStore">المخزن / الرف</label><input class="inp" id="pStore" value="'+esc(p?p.store:"")+'" placeholder="مخزن الدور الأرضي - رف B3"></div>'+
       '<div class="field"><label for="pQty">الكمية المتوفرة</label><input class="inp num" type="number" id="pQty" value="'+n(p?p.qty:0)+'"></div>'+
       '<div class="field"><label for="pMin">الحد الأدنى للتنبيه</label><input class="inp num" type="number" id="pMin" value="'+n(p?p.minQty:2)+'"></div>'+
-      '<div class="field"><label for="pUnit">الوحدة</label><input class="inp" id="pUnit" value="'+esc(p?p.unit:"حبة")+'"></div>'+
-      '<div class="field"><label for="pPrice">سعر الوحدة (د.ك)</label><input class="inp num" type="number" step="0.001" id="pPrice" value="'+(p?n(p.price):"")+'"></div>'+
     '</div>',
     actions:[].concat(
       p?[{label:"حذف الصنف", cls:"btn danger", act:()=>{
@@ -2656,8 +2650,7 @@ function partForm(p){
          if(!g("pName")){ toast("اسم الصنف مطلوب"); return; }
          await Store.save("parts",{
            id:p?p.id:undefined, name:g("pName"), code:g("pCode"), category:g("pCat"),
-           site:g("pSite"), store:g("pStore"), qty:n(g("pQty")), minQty:n(g("pMin")),
-           unit:g("pUnit")||"حبة", price:n(g("pPrice"))
+           site:g("pSite"), store:g("pStore"), qty:n(g("pQty")), minQty:n(g("pMin"))
          });
          closeModal(); toast("تم الحفظ"); render();
        }}])
@@ -2669,7 +2662,7 @@ function movForm(p,type){
   const techs=Store.list("technicians").map(t=>t.name);
   openModal({
     title:(type==="إدخال"?"إدخال إلى المخزن":"صرف من المخزن")+" — "+p.name,
-    body:'<p class="note">الرصيد الحالي: <b class="num">'+fmt(p.qty)+'</b> '+esc(p.unit||"حبة")+' في مخزن '+esc(p.site)+'</p>'+
+    body:'<p class="note">الرصيد الحالي: <b class="num">'+fmt(p.qty)+'</b> في مخزن '+esc(p.site)+'</p>'+
       '<div class="grid-f" style="margin-top:12px">'+
       '<div class="field"><label for="mQty">الكمية</label><input class="inp num" type="number" min="1" id="mQty" value="1"></div>'+
       '<div class="field"><label for="mTech">الفني / المستلم</label><input class="inp" id="mTech" list="mTechList" placeholder="الاسم">'+
@@ -4141,15 +4134,14 @@ function supParts(){
       '<section class="card"><div class="card-h"><h3>أصناف قطع الغيار</h3><span class="chip">'+fmt(rows.length)+' من '+fmt(all.length)+'</span></div>'+
       '<div class="card-b" style="padding-top:8px">'+(rows.length
         ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>الصنف</th><th>الرمز</th><th>الفئة</th><th>الموقع / المخزن</th>'+
-          '<th class="r">المتوفر</th><th class="r">الحد الأدنى</th><th>الوحدة</th><th class="r">سعر الوحدة</th><th></th></tr></thead><tbody>'+
+          '<th class="r">المتوفر</th><th class="r">الحد الأدنى</th><th></th></tr></thead><tbody>'+
           rows.map(p=>{
             const q=n(p.qty), low=q<=n(p.minQty);
             return '<tr class="stripe '+siteClass(p.site)+'"><td><b>'+esc(p.name)+'</b>'+(low?' <span class="chip crit"><i></i>تحت الحد</span>':'')+'</td>'+
               '<td class="mono">'+esc(p.code||"—")+'</td><td>'+esc(p.category||"—")+'</td>'+
               '<td><span class="chip '+siteClass(p.site)+'">'+esc(p.site)+'</span>'+(p.store?'<div style="font-size:11px;color:var(--ink-3)">'+esc(p.store)+'</div>':'')+'</td>'+
               '<td class="r num'+(q<=0?" qty-neg":(low?" qty-low":""))+'" style="font-weight:700">'+fmt(q)+'</td>'+
-              '<td class="r num">'+fmt(p.minQty)+'</td><td>'+esc(p.unit||"حبة")+'</td>'+
-              '<td class="r num">'+(p.price?n(p.price).toFixed(3):"—")+'</td>'+
+              '<td class="r num">'+fmt(p.minQty)+'</td>'+
               '<td class="r"><button class="btn sm ghost" data-sup-part="'+esc(p.id)+'">تعديل</button></td></tr>';
           }).join("")+'</tbody></table></div>'
         : '<div class="empty"><svg viewBox="0 0 24 24"><path d="M3 9l9-5 9 5v11H3zM9 20v-7h6v7"/></svg>'+
@@ -4842,7 +4834,7 @@ function render(){
   if(!Access.bothSites() && App.site!==homeSite()) App.site=homeSite();
   /* تُفتح قاعدة المركز الحكومي وحدها */
   Store.openSites(allowedSites());
-  if(["chief","settings","places"].indexOf(App.view)>=0 && !Access.isChief()) App.view="dashboard";
+  if(["chief","settings","places","warehouse"].indexOf(App.view)>=0 && !Access.isChief()) App.view="dashboard";
   if(App.view==="supervisor" && !canManageAny()) App.view="dashboard";
   if(Access.isChief() && CHIEF_VIEWS.indexOf(App.view)<0) App.view="chief";
   renderNav(); renderTop();
