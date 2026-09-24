@@ -693,22 +693,33 @@ const FIREBASE_CONFIG = {
   appId: "1:727686331379:web:353b7ad60368f2012d3086"
 };
 const FIREBASE_SDK = "https://www.gstatic.com/firebasejs/10.12.2/";
-/* حساب Firebase لكل جهة: <الاسم>@<authDomain> — تُنشأ من Authentication في Firebase Console */
-const ROLE_USER = {"المركز الحكومي":"gov", "__chief":"chief"};
-function roleEmail(scope){ return ROLE_USER[scope] ? ROLE_USER[scope]+"@"+FIREBASE_CONFIG.authDomain : ""; }
-function scopeOfEmail(email){
-  email=String(email||"").toLowerCase();
-  return Object.keys(ROLE_USER).find(k=>roleEmail(k).toLowerCase()===email) || null;
+/* الدخول بحساب Google: مالك النظام يصرّح لكل بريد بجهته من صفحة «حسابات الدخول»،
+   وتُحفظ القائمة في المستند config/roles داخل Firebase. */
+const OWNER_EMAIL = "aed60907080@gmail.com";
+const ROLE_GOV="gov", ROLE_CHIEF="chief";
+const ROLE_LABEL={gov:SITES[1], chief:"رئيس الفريق"};
+function roleMap(){ return (Store.roles&&Store.roles.emails)||{}; }
+function roleOfEmail(email){
+  email=String(email||"").trim().toLowerCase();
+  if(!email) return "";
+  if(email===OWNER_EMAIL.toLowerCase()) return ROLE_CHIEF; /* المالك يدخل كرئيس فريق ويدير الحسابات */
+  return roleMap()[email] || "";
 }
+function scopeOfEmail(email){
+  const r=roleOfEmail(email);
+  return r===ROLE_CHIEF ? CHIEF_KEY : (r===ROLE_GOV ? SITES[1] : null);
+}
+function isOwnerEmail(email){ return String(email||"").trim().toLowerCase()===OWNER_EMAIL.toLowerCase(); }
 function authMsg(code){
   code=String(code||"");
-  if(/invalid-credential|wrong-password|user-not-found|invalid-login/.test(code)) return "كلمة السر غير صحيحة لهذه الجهة. تأكد من الجهة المختارة، ومن زر Caps Lock.";
-  if(/too-many-requests/.test(code)) return "محاولات كثيرة خاطئة — انتظر دقائق ثم حاول مرة أخرى.";
+  if(/popup-closed-by-user|cancelled-popup-request|user-cancelled/.test(code)) return "أُلغي الدخول قبل اختيار الحساب.";
+  if(/popup-blocked/.test(code)) return "المتصفح منع النافذة المنبثقة — اسمح بها ثم حاول مرة أخرى.";
+  if(/unauthorized-domain/.test(code)) return "هذا الرابط غير مضاف في Firebase ← Authentication ← Settings ← Authorized domains.";
+  if(/operation-not-allowed/.test(code)) return "الدخول بحساب Google غير مفعّل في Firebase ← Authentication ← Sign-in method.";
+  if(/account-exists-with-different-credential/.test(code)) return "هذا البريد مسجّل بطريقة دخول أخرى.";
+  if(/too-many-requests/.test(code)) return "محاولات كثيرة — انتظر دقائق ثم حاول مرة أخرى.";
   if(/network-request-failed/.test(code)) return "تعذّر الاتصال بالإنترنت — تحقّق من الشبكة ثم حاول مرة أخرى.";
-  if(/weak-password/.test(code)) return "كلمة السر ضعيفة — ٦ أحرف على الأقل.";
-  if(/requires-recent-login/.test(code)) return "انتهت صلاحية الجلسة — اخرج وادخل من جديد ثم غيّر كلمة السر.";
   if(/user-disabled/.test(code)) return "هذا الحساب موقوف من Firebase Console.";
-  if(/operation-not-allowed/.test(code)) return "الدخول بالبريد وكلمة السر غير مفعّل في Firebase ← Authentication.";
   return "تعذّر الدخول ("+code+").";
 }
 function loadScript(src){
@@ -840,7 +851,7 @@ const Store = {
   _parts:{},
   _unsubs:[], _gen:0,
   config:JSON.parse(JSON.stringify(DEFAULT_CONFIG)),
-  access:{},
+  access:{}, roles:{}, deniedEmail:"",
   _subs:[],
   on(fn){ this._subs.push(fn); },
   emit(){ this._subs.forEach(f=>{ try{ f(); }catch(e){ console.error(e); } }); },
@@ -902,21 +913,57 @@ const Store = {
       this.auth.onAuthStateChanged(u=>{ this._onUser(u); if(first){ first=false; res(); } });
     });
   },
-  _onUser(u){
-    const scope=u ? scopeOfEmail(u.email) : null;
-    if(u && !scope){
-      this.auth.signOut().catch(()=>{});
-      if(this.ready) toast("هذا الحساب غير مرتبط بأي جهة في النظام");
-      return;
-    }
-    if(scope){
-      if(Access.state.scope!==scope) Access.adopt(scope);
-      this._sharedOn();
-    }else{
+  async _onUser(u){
+    this.user=u||null;
+    if(!u){
       this._sharedOff();
       if(Access.state.scope){ Access.state.scope=null; this.closeSites(true); }
+      if(this.ready) this.emit();
+      return;
     }
+    /* قائمة الحسابات المصرّح لها تُقرأ أولاً لتحديد جهة هذا البريد */
+    if(!isOwnerEmail(u.email)){
+      try{
+        const s=await this.db.doc("config/roles").get();
+        this.roles = s.exists ? (s.data()||{}) : {};
+      }catch(e){ console.warn("roles", e); this.roles={}; }
+    }
+    const scope=scopeOfEmail(u.email);
+    if(!scope){
+      this.deniedEmail=u.email||"";
+      await this.auth.signOut().catch(()=>{});
+      if(this.ready) this.emit();
+      return;
+    }
+    this.deniedEmail="";
+    if(Access.state.scope!==scope) Access.adopt(scope);
+    this._sharedOn();
     if(this.ready) this.emit();
+  },
+  /* الدخول بحساب Google */
+  async googleSignIn(){
+    try{
+      const P=firebase.auth.Auth.Persistence;
+      await this.auth.setPersistence(P.LOCAL);
+    }catch(e){}
+    const prov=new firebase.auth.GoogleAuthProvider();
+    prov.setCustomParameters({prompt:"select_account"});
+    try{
+      await this.auth.signInWithPopup(prov);
+      return {ok:true};
+    }catch(e){
+      const c=String(e&&e.code||"");
+      if(/popup-blocked|popup-closed|cancelled-popup|operation-not-supported/.test(c)){
+        try{ await this.auth.signInWithRedirect(prov); return {ok:true, redirect:true}; }catch(e2){ return {ok:false, msg:authMsg(e2&&e2.code)}; }
+      }
+      return {ok:false, msg:authMsg(c)};
+    }
+  },
+  /* حفظ قائمة الحسابات المصرّح لها (المالك فقط) */
+  async saveRoles(emails){
+    const body={emails:emails, updatedAt:new Date().toISOString()};
+    await this.db.doc("config/roles").set(body);
+    this.roles=body; this.emit();
   },
   /* القوائم واسم رئيس الفريق: تُقرأ بعد الدخول فقط */
   _sharedOn(){
@@ -924,6 +971,8 @@ const Store = {
     const cfgRef=this.db.doc("config/lists"), accRef=this.db.doc("config/access");
     let seeded=false;
     this._sharedUnsubs=[
+      this.db.doc("config/roles").onSnapshot(s=>{ this.roles = s.exists ? (s.data()||{}) : {}; this.emit(); },
+        e=>console.warn("roles-sub", e)),
       cfgRef.onSnapshot(s=>{
         if(s.exists) this.config=Object.assign(JSON.parse(JSON.stringify(DEFAULT_CONFIG)), s.data());
         else if(!seeded && !s.metadata.fromCache){ seeded=true; cfgRef.set(this.config).catch(e=>console.warn("cfg-seed",e)); }
@@ -936,28 +985,6 @@ const Store = {
     (this._sharedUnsubs||[]).forEach(u=>{ try{ u(); }catch(e){} });
     this._sharedUnsubs=null;
     this.config=JSON.parse(JSON.stringify(DEFAULT_CONFIG)); this.access={};
-  },
-  async authSignIn(scope,pass,remember){
-    const email=roleEmail(scope);
-    try{
-      const P=firebase.auth.Auth.Persistence;
-      await this.auth.setPersistence(remember ? P.LOCAL : P.SESSION);
-    }catch(e){}
-    /* تجربة الكلمة كما كُتبت ثم بتخطيط لوحة المفاتيح الآخر */
-    const tries=[pass].concat([kbToArabic(pass), kbToLatin(pass)].filter((v,i,a)=>v && v!==pass && a.indexOf(v)===i));
-    for(let i=0;i<tries.length;i++){
-      try{ await this.auth.signInWithEmailAndPassword(email,tries[i]); return {ok:true, variant:i>0}; }
-      catch(e){ if(!/invalid-credential|wrong-password|invalid-login/.test(String(e&&e.code))) return {ok:false, msg:authMsg(e&&e.code)}; }
-    }
-    return {ok:false, msg:authMsg("auth/invalid-credential")};
-  },
-  async authChangePassword(cur,next){
-    const u=this.auth.currentUser;
-    if(!u) return "انتهت الجلسة — ادخل من جديد.";
-    try{ await u.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(u.email,cur)); }
-    catch(e){ return /invalid-credential|wrong-password/.test(String(e&&e.code)) ? "كلمة السر الحالية غير صحيحة." : authMsg(e&&e.code); }
-    try{ await u.updatePassword(next); return null; }
-    catch(e){ return authMsg(e&&e.code); }
   },
 
   /* ---------- القوائم وكلمات السر: مشتركة ---------- */
@@ -1347,6 +1374,9 @@ const Access={
   },
   in(){ return !!this.state.scope; },
   isAdmin(){ return this.state.scope===SITES[1]; },
+  /* مالك النظام: يدير حسابات الدخول */
+  isOwner(){ return this.auth() && !!(Store.user && isOwnerEmail(Store.user.email)); },
+  userEmail(){ return (Store.user && Store.user.email) || ""; },
   isChief(){ return this.state.scope===CHIEF_KEY; },
   bothSites(){ return false; },
   label(){
@@ -3411,14 +3441,7 @@ async function approveMany(ids){
    ============================================================ */
 /* تغيير كلمة سر جهة — يعيد نص الخطأ أو null عند النجاح */
 async function pwChange(target,verifyKey,cur,a,b){
-  if(Access.auth()){
-    /* Firebase: كل جهة تغيّر كلمة سر حسابها وحدها بعد التحقق بالكلمة الحالية */
-    if(target!==Access.state.scope) return "كلمة سر كل جهة تُغيَّر بعد الدخول بحسابها نفسه.";
-    if(a.length<6) return "كلمة السر الجديدة يجب ألا تقل عن ٦ أحرف.";
-    if(a!==b) return "كلمتا السر غير متطابقتين.";
-    if(!cur) return "أدخل كلمة السر الحالية.";
-    return await Store.authChangePassword(cur,a);
-  }
+  if(Access.auth()) return "الدخول بحساب Google — لا توجد كلمة سر في النظام.";
   if(a.length<4) return "كلمة السر الجديدة يجب ألا تقل عن ٤ أحرف.";
   if(a!==b) return "كلمتا السر غير متطابقتين.";
   if(!cur) return (verifyKey===CHIEF_KEY && target!==CHIEF_KEY) ? "أدخل كلمة سر رئيس الفريق للتحقق." : "أدخل كلمة السر الحالية.";
@@ -3432,8 +3455,8 @@ async function pwChange(target,verifyKey,cur,a,b){
 }
 function securityNote(){
   if(Access.auth()) return '<p class="note" style="margin-top:14px">الحماية مطبّقة على خادم Firebase: '+
-    'قواعد الأمان تحصر الوصول في حسابي المركز الحكومي ورئيس الفريق. '+
-    'إن نُسيت كلمة سر جهة: احذف حسابها من Firebase Console ← Authentication وأنشئه من جديد بالبريد نفسه.</p>';
+    'لا يفتح البيانات إلا من دخل بحساب Google مصرّح له في «حسابات الدخول»، وقواعد الأمان تتحقق من ذلك على الخادم. '+
+    'لا توجد كلمات سر داخل النظام، ومنع أي شخص يتم بإزالة بريده من القائمة.</p>';
   return '<p class="note" style="margin-top:14px">كلمات السر تفصل الجهات على مستوى الاستخدام اليومي. '+
   'رئيس الفريق يرى التقارير الشهرية ويعدّلها فقط، ولا يصل إلى أوامر الصيانة أو المخزن من واجهته. '+
   'مع ذلك هذه ليست حماية أمنية كاملة — الفصل يتم داخل النظام، ومن يملك خبرة تقنية ويصل إلى الرابط يستطيع تجاوزه. '+
@@ -3720,7 +3743,14 @@ function viewSettings(){
           (Store.mode==="local"?' <b>هذا الجهاز يحفظ بياناته لنفسه فقط — احفظ ملف Excel بانتظام.</b>':'')+'</p>'+
       '</div></section>'+
 
-      (admin && !Access.auth()
+      (Access.auth()
+        ? '<section class="card"><div class="card-h"><h3>حسابك</h3><span class="chip ok"><i></i>Google</span></div><div class="card-b">'+
+            '<dl class="kv">'+kv("البريد", Access.userEmail()||"—")+kv("الجهة", Access.label())+
+              kv("إدارة الحسابات", Access.isOwner()?"أنت مالك النظام":"من صلاحية مالك النظام")+'</dl>'+
+            (Access.isOwner()?'<div style="display:flex;gap:9px;margin-top:14px"><button class="btn" data-sup="passwords">حسابات الدخول</button></div>':'')+
+            securityNote()+
+          '</div></section>'
+      : admin
         ? '<section class="card"><div class="card-h"><h3>كلمات السر</h3><span class="chip">إدارة المركز</span></div><div class="card-b">'+
             '<p style="margin:0 0 12px;color:var(--ink-2)">ضبط كلمة سر المركز الحكومي وكلمة سر رئيس الفريق وتغييرهما من صفحة إدارة المركز.</p>'+
             '<button class="btn" data-sup="passwords">إدارة كلمات السر</button></div></section>'
@@ -3786,7 +3816,7 @@ function viewSettings(){
    ============================================================ */
 const Sup={tab:"passwords", q:"", site:"", dept:"", pq:"", psite:""};
 const SUP_TABS=[
-  {k:"passwords", t:"كلمات السر"},
+  {k:"passwords", t:"حسابات الدخول"},
   {k:"employees", t:"الموظفون"},
   {k:"locations", t:"مواقع العمل"},
   {k:"lists",     t:"الأقسام والقطاعات"},
@@ -3821,16 +3851,57 @@ function viewSupervisor(){
 
 /* ---- كلمات السر ---- */
 function supPasswords(){
+  /* وضع Google: قائمة البريد المصرّح له وجهة كل واحد — يديرها مالك النظام */
   if(Access.auth()){
-    const rows=[[SITES[1],roleEmail(SITES[1])],["رئيس الفريق",roleEmail(CHIEF_KEY)]];
+    const owner=Access.isOwner();
+    const map=roleMap();
+    const emails=Object.keys(map).sort();
+    const rows=emails.map(em=>
+      '<tr><td class="mono">'+esc(em)+'</td>'+
+      '<td>'+(owner
+        ? '<select class="inp" style="min-width:160px" data-role-em="'+esc(em)+'">'+optionsHTML([ROLE_GOV,ROLE_CHIEF].map(r=>ROLE_LABEL[r]), ROLE_LABEL[map[em]])+'</select>'
+        : '<span class="chip">'+esc(ROLE_LABEL[map[em]]||map[em])+'</span>')+'</td>'+
+      '<td class="r">'+(owner?'<button class="btn sm ghost danger" data-role-del="'+esc(em)+'">إزالة</button>':'')+'</td></tr>').join("");
     return {
-      html:'<section class="card"><div class="card-h"><h3>حسابات المركز الحكومي</h3><span class="chip">Firebase</span></div><div class="card-b">'+
-        '<p style="margin:0 0 12px;color:var(--ink-2)">كلمات السر محفوظة في Firebase Authentication. كل جهة تغيّر كلمة سر حسابها من صفحة الإعدادات بعد الدخول به.</p>'+
-        simpleTable(["الجهة","بريد الحساب"], rows)+
-        '<div style="display:flex;gap:9px;margin-top:14px"><button class="btn" data-go-settings>تغيير كلمة سري ←</button></div>'+
+      html:'<section class="card"><div class="card-h"><h3>حسابات الدخول</h3><span class="chip">Google</span></div><div class="card-b">'+
+        '<p style="margin:0 0 12px;color:var(--ink-2)">كل شخص يدخل بحساب Google الخاص به، وجهته تُحدَّد من بريده. لا توجد كلمات سر في النظام.</p>'+
+        '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>بريد Google</th><th>الجهة</th><th></th></tr></thead><tbody>'+
+          '<tr><td class="mono">'+esc(OWNER_EMAIL)+'</td><td><span class="chip ok"><i></i>مالك النظام — رئيس الفريق</span></td><td></td></tr>'+
+          rows+
+          (emails.length?'':'<tr><td colspan="3" style="color:var(--ink-3)">لم يُصرَّح لأي بريد آخر بعد</td></tr>')+
+        '</tbody></table></div>'+
+        (owner
+          ? '<div class="filters" style="margin:14px 0 0">'+
+              '<div class="field grow"><label for="roleEm">بريد Google</label><input class="inp mono" id="roleEm" placeholder="name@gmail.com" autocomplete="off"></div>'+
+              '<div class="field"><label for="roleSel">الجهة</label><select class="inp" id="roleSel">'+optionsHTML([ROLE_LABEL[ROLE_GOV],ROLE_LABEL[ROLE_CHIEF]],ROLE_LABEL[ROLE_GOV])+'</select></div>'+
+              '<button class="btn pri" id="roleAdd">تصريح الدخول</button>'+
+            '</div>'
+          : '<p class="note" style="margin-top:14px">إضافة الحسابات وإزالتها من صلاحية مالك النظام ('+esc(OWNER_EMAIL)+').</p>')+
         securityNote()+
       '</div></section>',
-      mount(root){ const b=$("[data-go-settings]",root); if(b) b.onclick=()=>go("settings"); }
+      mount(root){
+        const labelToRole=v=> v===ROLE_LABEL[ROLE_CHIEF] ? ROLE_CHIEF : ROLE_GOV;
+        const save=async m=>{ try{ await Store.saveRoles(m); render(); }catch(e){ console.error(e); toast("تعذّر الحفظ — تأكد أنك داخل بحساب المالك"); } };
+        const add=$("#roleAdd",root);
+        if(add) add.onclick=async()=>{
+          const em=String($("#roleEm",root).value||"").trim().toLowerCase();
+          if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em)){ toast("اكتب بريداً صحيحاً"); return; }
+          if(isOwnerEmail(em)){ toast("هذا بريد المالك، وهو مصرّح أصلاً"); return; }
+          const m=Object.assign({}, roleMap()); m[em]=labelToRole($("#roleSel",root).value);
+          await save(m); toast("صُرّح لـ"+em);
+        };
+        $$("[data-role-em]",root).forEach(sel=>sel.onchange=async()=>{
+          const m=Object.assign({}, roleMap()); m[sel.dataset.roleEm]=labelToRole(sel.value);
+          await save(m); toast("حُدّثت جهة "+sel.dataset.roleEm);
+        });
+        $$("[data-role-del]",root).forEach(b=>b.onclick=()=>{
+          const em=b.dataset.roleDel;
+          confirmBox("إزالة حساب","لن يعود «"+em+"» يستطيع الدخول إلى النظام.",async()=>{
+            const m=Object.assign({}, roleMap()); delete m[em];
+            await save(m); toast("أُزيل "+em);
+          },"إزالة");
+        });
+      }
     };
   }
   const e=Access.entries();
@@ -4608,7 +4679,8 @@ let gatePick=null;
 /* بصمة حالة شاشة الدخول: تتغير فقط إذا تغيّر ما يُعرض فعلاً */
 function gateSig(){
   const e=Access.entries();
-  return [Store.ready?1:0, Access.configured()?1:0, PW_TARGETS.map(t=>e[t.k]?1:0).join(""), gatePick||""].join("|");
+  return [Store.ready?1:0, Access.configured()?1:0, PW_TARGETS.map(t=>e[t.k]?1:0).join(""), gatePick||"",
+    Store.error||"", Store.deniedEmail||""].join("|");
 }
 /* يعيد رسم شاشة الدخول مع الإبقاء على ما كتبه المستخدم */
 function renderGate(){
@@ -4676,7 +4748,33 @@ function renderGateInner(){
     return;
   }
 
-  /* شاشة الدخول */
+  /* شاشة الدخول بحساب Google (وضع Firebase) */
+  if(Access.auth()){
+    const denied=Store.deniedEmail||"";
+    g.innerHTML='<div class="gate-card">'+head+
+      '<div class="gate-b">'+
+        '<p class="note" style="margin:0">ادخل بحساب Google الخاص بك. جهتك في النظام — المركز الحكومي أو رئيس الفريق — تُحدَّد من بريدك تلقائياً.</p>'+
+        (denied?'<div class="gate-err on">البريد <b>'+esc(denied)+'</b> غير مصرّح له بعد. يضيفه مالك النظام من صفحة «حسابات الدخول».</div>':'')+
+        '<div class="gate-err" id="gErr"></div>'+
+        '<button class="btn pri" id="gGoogle" style="justify-content:center">'+
+          '<svg viewBox="0 0 24 24" style="fill:none;stroke:currentColor"><path d="M21 12.2c0-.7-.1-1.3-.2-1.9H12v3.6h5.1a4.4 4.4 0 01-1.9 2.9v2.4h3.1c1.8-1.7 2.7-4.1 2.7-7z"/><path d="M12 21c2.5 0 4.6-.8 6.2-2.3l-3.1-2.4c-.8.6-1.9.9-3.1.9-2.4 0-4.5-1.6-5.2-3.8H3.6v2.4A9 9 0 0012 21z"/><path d="M6.8 13.4a5.4 5.4 0 010-3.5V7.5H3.6a9 9 0 000 8.1l3.2-2.2z"/><path d="M12 6.6c1.3 0 2.5.5 3.5 1.4l2.6-2.6A9 9 0 003.6 7.5l3.2 2.4C7.5 7.7 9.6 6.6 12 6.6z"/></svg>'+
+          'الدخول بحساب Google</button>'+
+      '</div>'+
+      '<div class="gate-foot">الحماية مطبّقة على خادم Firebase: لا تُفتح البيانات إلا للحسابات المصرّح لها.</div></div>';
+    const gb=$("#gGoogle");
+    gb.onclick=async()=>{
+      const e=$("#gErr"); e.classList.remove("on");
+      gb.disabled=true;
+      Store.deniedEmail="";
+      const res=await Store.googleSignIn();
+      if(!res.ok){ e.textContent=res.msg; e.classList.add("on"); gb.disabled=false; return; }
+      /* بعد نجاح الدخول يتولّى مستمع Firebase فتح النظام */
+      setTimeout(()=>{ if(!Access.in()){ gb.disabled=false; renderGate(); } },2500);
+    };
+    return;
+  }
+
+  /* شاشة الدخول بكلمة السر (التخزين المحلي) */
   const isSet = k => Access.auth() || !!Access.entries()[k];
   const opts=[
     {k:SITES[1],  nm:SITES[1],      ds:"أوامر الصيانة والمخزن والتقارير"},
@@ -4736,10 +4834,6 @@ function renderGateInner(){
         }
       }
       await Access.setMany([[gatePick,pass]]);
-    }else if(Access.auth()){
-      const res=await Store.authSignIn(gatePick, pass, $("#gRem").checked);
-      layoutNote=res.variant;
-      if(!res.ok){ err(res.msg); $("#gIn").disabled=false; $("#gPass").select(); return; }
     }else{
       const res=await Access.checkAny(gatePick,pass);
       layoutNote=res.variant;

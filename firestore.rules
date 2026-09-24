@@ -1,25 +1,39 @@
 rules_version = '2';
 
-// قواعد أمان سجل صيانة الأجهزة — المركز الحكومي
+// قواعد أمان سجل صيانة الأجهزة — الدخول بحساب Google
 // مشروع datawork-dfa0e — تُلصق هذه القواعد في Firestore ← Rules ← Publish.
+// الجهات تُحدَّد من المستند config/roles الذي يديره مالك النظام.
 service cloud.firestore {
   match /databases/{database}/documents {
 
     function email() {
-      return request.auth != null ? request.auth.token.email : '';
+      return request.auth != null && request.auth.token.email != null
+        ? request.auth.token.email.lower() : '';
     }
-    function isGov()   { return email() == 'gov@datawork-dfa0e.firebaseapp.com'; }
-    function isChief() { return email() == 'chief@datawork-dfa0e.firebaseapp.com'; }
+    function isOwner() { return email() == 'aed60907080@gmail.com'; }
+    function roleOf() {
+      return exists(/databases/$(database)/documents/config/roles)
+        ? get(/databases/$(database)/documents/config/roles).data.emails.get(email(), '')
+        : '';
+    }
+    function isGov()   { return isOwner() || roleOf() == 'gov'; }
+    function isChief() { return isOwner() || roleOf() == 'chief'; }
     function isStaff() { return isGov() || isChief(); }
 
-    // قاعدة المركز الحكومي: حساب المركز ورئيس الفريق فقط
+    // قائمة الحسابات المصرّح لها: يقرأها كل من دخل، ويكتبها المالك وحده
+    match /config/roles {
+      allow read: if request.auth != null;
+      allow write: if isOwner();
+    }
+
+    // بيانات المركز الحكومي: الحسابات المصرّح لها فقط
     match /sites/GC/{path=**} {
       allow read, write: if isStaff();
     }
 
-    // المشترك: القوائم واسم رئيس الفريق والفنيون
+    // القوائم واسم رئيس الفريق والفنيون
     match /config/{doc} {
-      allow read, write: if isStaff();
+      allow read, write: if isStaff() && doc != 'roles';
     }
     match /technicians/{doc} {
       allow read, write: if isStaff();
