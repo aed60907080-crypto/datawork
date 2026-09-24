@@ -900,25 +900,26 @@ const Store = {
     try{ await this.db.enablePersistence({synchronizeTabs:true}); }
     catch(e){ console.warn("offline-persistence", e && e.code); }
     this.auth=firebase.auth();
+    /* الجهاز يتصل بالقاعدة باتصال مجهول، وكلمات سر الجهات داخل النظام يديرها رئيس الفريق */
     await new Promise(res=>{
       let first=true;
-      this.auth.onAuthStateChanged(u=>{ this._onUser(u); if(first){ first=false; res(); } });
+      this.auth.onAuthStateChanged(u=>{
+        this._onUser(u);
+        if(first){ first=false; res(); }
+      });
+      this.auth.signInAnonymously().catch(e=>{
+        console.warn("anon-auth", e && e.code);
+        this.error = /operation-not-allowed|admin-restricted/.test(String(e&&e.code))
+          ? "فعّل الدخول المجهول في Firebase ← Authentication ← Sign-in method ← Anonymous."
+          : "تعذّر الاتصال بقاعدة البيانات — تحقّق من الإنترنت ثم أعد تحميل الصفحة.";
+        if(first){ first=false; res(); }
+      });
     });
   },
   _onUser(u){
-    const scope=u ? scopeOfEmail(u.email) : null;
-    if(u && !scope){
-      this.auth.signOut().catch(()=>{});
-      if(this.ready) toast("هذا الحساب غير مرتبط بأي جهة في النظام");
-      return;
-    }
-    if(scope){
-      if(Access.state.scope!==scope) Access.adopt(scope);
-      this._sharedOn();
-    }else{
-      this._sharedOff();
-      if(Access.state.scope){ Access.state.scope=null; this.closeSites(true); }
-    }
+    this.user=u||null;
+    if(u){ this.error=""; this._sharedOn(); }
+    else this._sharedOff();
     if(this.ready) this.emit();
   },
   /* القوائم واسم رئيس الفريق: تُقرأ بعد الدخول فقط */
@@ -1319,7 +1320,8 @@ const Access={
   },
   entries(){ return (Store.access&&Store.access.entries)||{}; },
   /* في وضع Firebase: الحسابات تُنشأ من Firebase Console، فكل الجهات مضبوطة */
-  auth(){ return Store.mode==="firebase"; },
+  /* كلمات السر داخل النظام في الوضعين، ويديرها رئيس الفريق */
+  auth(){ return false; },
   pwMin(){ return this.auth() ? 6 : 4; },
   configured(){ if(this.auth()) return true; const e=this.entries(); return !!(e[SITES[1]]&&e[CHIEF_KEY]); },
   hasAdmin(){ return this.auth() || !!this.entries()[ADMIN_KEY]; },
@@ -3441,7 +3443,9 @@ const Net={on: (typeof navigator!=="undefined" && "onLine" in navigator) ? navig
 function netOnline(){ return Net.on; }
 function netStateText(){
   if(Store.mode==="local") return "تخزين محلي على هذا المتصفح";
-  if(!netOnline()) return "بدون إنترنت — يُحفظ على الجهاز"+(AutoXL.handle?" وفي ملف Excel":"")+" ويُرفع عند عودة الشبكة";
+  if(!netOnline()) return AutoXL.handle
+    ? "بدون إنترنت — يُحفظ في ملف Excel وعلى الجهاز، ويُرفع للقاعدة عند عودة الشبكة"
+    : "بدون إنترنت — يُحفظ على الجهاز ويُرفع عند عودة الشبكة (اربط ملف Excel من الإعدادات)";
   return "قاعدة البيانات المشتركة"+(Store.mode==="firebase"?" · Firebase":"")+(AutoXL.handle?" + ملف Excel":"");
 }
 function renderNetState(){
@@ -3645,6 +3649,7 @@ async function autoXlWrite(force){
     await w.write(buf); await w.close();
     AutoXL.sig=sig; AutoXL.last=new Date(); AutoXL.needPerm=false;
     const el=$("#autoXlState"); if(el) el.textContent=autoXlStateText();
+    if(!netOnline()) toast("حُفظت البيانات في ملف Excel — وتُرفع للقاعدة عند عودة الشبكة");
   }catch(e){ console.warn("autoxl-write", e); }
   finally{
     AutoXL.busy=false;
@@ -3655,7 +3660,8 @@ async function autoXlWrite(force){
 function autoXlSchedule(){
   if(!AutoXL.handle || !Access.in() || !Store.sitesReady) return;
   clearTimeout(AutoXL.timer);
-  AutoXL.timer=setTimeout(()=>autoXlWrite(false), 3000);
+  /* بدون إنترنت يكون الملف هو النسخة المطمئنة، فيُكتب أسرع */
+  AutoXL.timer=setTimeout(()=>autoXlWrite(false), netOnline() ? 3000 : 1200);
 }
 function autoXlStateText(){
   if(!AutoXL.handle) return "غير مفعّل";

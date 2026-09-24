@@ -1,28 +1,27 @@
 rules_version = '2';
 
-// قواعد أمان سجل صيانة الأجهزة — المركز الحكومي
-// مشروع datawork-dfa0e — تُلصق هذه القواعد في Firestore ← Rules ← Publish.
+// قواعد أمان سجل صيانة الأجهزة — مشروع datawork-dfa0e
+// الأجهزة تتصل بالقاعدة باتصال مجهول (Anonymous)، وكلمات سر الجهات داخل النظام
+// محفوظة مُجزَّأة في config/access ويديرها رئيس الفريق.
+// تُلصق هذه القواعد في Firestore ← Rules ← Publish.
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    function email() {
-      return request.auth != null ? request.auth.token.email : '';
-    }
-    function isGov()   { return email() == 'gov@datawork-dfa0e.firebaseapp.com'; }
-    function isChief() { return email() == 'chief@datawork-dfa0e.firebaseapp.com'; }
-    function isStaff() { return isGov() || isChief(); }
+    function signedIn() { return request.auth != null; }
 
-    // قاعدة المركز الحكومي: حساب المركز ورئيس الفريق فقط
+    // بيانات المركز الحكومي
     match /sites/GC/{path=**} {
-      allow read, write: if isStaff();
+      allow read, write: if signedIn();
     }
 
-    // المشترك: القوائم واسم رئيس الفريق والفنيون
+    // القوائم وكلمات السر المُجزَّأة واسم رئيس الفريق
     match /config/{doc} {
-      allow read, write: if isStaff();
+      allow read, write: if signedIn();
     }
+
+    // الفنيون
     match /technicians/{doc} {
-      allow read, write: if isStaff();
+      allow read, write: if signedIn();
     }
 
     // أي مسار آخر مغلق
