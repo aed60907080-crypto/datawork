@@ -972,7 +972,7 @@ const Store = {
       }
     }
     return {ok:false, msg: last==="auth/too-many-requests" ? authMsg(last)
-      : "كلمة السر غير صحيحة لهذه الجهة، أو أنها أقل من ٦ أحرف عند أول ضبط."};
+      : "كلمة السر يجب ألا تقل عن ٦ أحرف. اكتب كلمة سر من ٦ أحرف فأكثر: إن كانت هذه أول مرة لهذه الجهة فستُضبط بها الآن."};
   },
   async authChangePassword(cur,next){
     const u=this.auth.currentUser;
@@ -4756,7 +4756,11 @@ function renderGateInner(){
         })()+
       '</div></div>'+
       pwField("gPass","كلمة السر",{auto:first?"new-password":"current-password",
-        ph: first ? "اختر كلمة سر «"+picked.nm+"» — ٤ أحرف على الأقل" : "كلمة سر الجهة المختارة"})+
+        ph: first ? "اختر كلمة سر «"+picked.nm+"» — "+(Access.auth()?"٦":"٤")+" أحرف على الأقل"
+                  : "كلمة سر «"+picked.nm+"»"+(Access.auth()?" — ٦ أحرف على الأقل":"")})+
+      (Access.auth()
+        ? '<p class="hint" style="margin:-4px 0 0">إن لم تُضبط كلمة سر هذه الجهة بعد، فأول كلمة سر تكتبها هنا تصبح كلمة سرها — ولا تقل عن ٦ أحرف.</p>'
+        : '')+
       '<p class="hint" id="gLang" style="margin:-4px 0 0;min-height:1.3em" aria-live="polite"></p>'+
       (first ? pwField("gPass2","تأكيد كلمة السر",{auto:"new-password"})+
                '<p class="hint" style="margin:-4px 0 0">أول دخول لجهة «'+esc(picked.nm)+'» — اختر كلمة سرها الآن، وتُطلب منها في كل دخول لاحق.</p>' : "")+
