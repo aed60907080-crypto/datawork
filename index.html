@@ -1301,7 +1301,7 @@ const PW_TARGETS=[
   {k:CHIEF_KEY, nm:"رئيس الفريق", ds:"التقارير، والفنيون، وبدل الموقع، وإدارة المركز"}
 ];
 /* الصفحات المتاحة لرئيس الفريق */
-const CHIEF_VIEWS=["chief","reports","technicians","warehouse","places","supervisor","settings"];
+const CHIEF_VIEWS=["chief","dashboard","reports","technicians","warehouse","places","supervisor","settings"];
 const Access={
   state:{scope:null},
   async hash(pass,salt){
@@ -1358,7 +1358,7 @@ const Access={
     try{ if(remember) localStorage.setItem("mpw.session",payload); else localStorage.removeItem("mpw.session"); }catch(e){}
   },
   signOut(){
-    this.state.scope=null; App.view="dashboard"; App.params={}; gatePick=null;
+    this.state.scope=null; App.view="records"; App.params={}; gatePick=null;
     Object.assign(Sup,{tab:"passwords", q:"", site:"", dept:"", pq:"", psite:""});
     try{ sessionStorage.removeItem("mpw.session"); }catch(e){}
     try{ localStorage.removeItem("mpw.session"); }catch(e){}
@@ -1377,7 +1377,7 @@ const Access={
       if(s && (s.scope===SITES[1]||s.scope===CHIEF_KEY) && e[s.scope]){
         this.state.scope=s.scope;
         App.site = SITES[1];
-        if(s.scope===CHIEF_KEY && App.view==="dashboard") App.view="chief";
+        if(s.scope===CHIEF_KEY) App.view="chief";
       }
     }catch(e){}
   },
@@ -1725,7 +1725,7 @@ const ICONS = {
 };
 const VIEWS = [
   {k:"chief",       t:"لوحة رئيس الفريق", only:"chief"},
-  {k:"dashboard",   t:"لوحة المتابعة"},
+  {k:"dashboard",   t:"لوحة المتابعة", only:"chief"},
   {k:"neworder",    t:"أمر صيانة جديد"},
   {k:"records",     t:"سجل الصيانة"},
   {k:"warehouse",   t:"مخزن قطع الغيار", only:"chief"},
@@ -1737,7 +1737,7 @@ const VIEWS = [
 ];
 
 const App = {
-  site:"الكل", view:"dashboard", params:{},
+  site:"الكل", view:"records", params:{},
   filters:{q:"",sector:"",dept:"",floor:"",devType:"",mtype:"",status:"",tech:"",chief:"",from:"",to:""},
   reportMonth: ymOf(today()),
   chartYear: new Date().getFullYear()
@@ -2700,8 +2700,24 @@ function techStats(name){
     parts:recs.reduce((s,r)=>s+(r.parts||[]).reduce((x,p)=>x+n(p.qty),0),0)
   };
 }
+/* ترتيب جدول الفنيين: ضغطة على رأس العمود تُصعِّد وأخرى تُنزِّل، والبداية بالأعلى رقماً */
+const TechSort={key:"total", dir:"desc"};
+function techSortHead(key,label,cls){
+  const on=TechSort.key===key;
+  return '<th'+(cls?' class="'+cls+'"':'')+' style="cursor:pointer;user-select:none" data-tsort="'+key+'"'+
+    ' title="اضغط للترتيب">'+esc(label)+
+    '<span style="margin-inline-start:4px;opacity:'+(on?"1":".35")+'">'+(on ? (TechSort.dir==="desc"?"▼":"▲") : "↕")+'</span></th>';
+}
 function viewTechnicians(){
-  const list=Store.list("technicians").filter(t=>App.site==="الكل"||!t.site||t.site==="كلا الموقعين"||t.site===App.site);
+  const list=Store.list("technicians").filter(t=>App.site==="الكل"||!t.site||t.site==="كلا الموقعين"||t.site===App.site)
+    .slice().sort((a,b)=>{
+      const sa=techStats(a.name), sb=techStats(b.name);
+      const val=(t,s)=>({name:t.name||"", specialty:t.specialty||"", phone:t.phone||"",
+        total:s.total, month:s.month, openC:s.openC})[TechSort.key];
+      const x=val(a,sa), y=val(b,sb);
+      const c = (typeof x==="number" && typeof y==="number") ? x-y : String(x).localeCompare(String(y),"ar");
+      return TechSort.dir==="desc" ? -c : c;
+    });
   const known=list.map(t=>t.name);
   const ghosts=Array.from(new Set(siteFilter(Store.list("records")).map(r=>r.tech).filter(Boolean))).filter(nm=>known.indexOf(nm)<0);
   return {
@@ -2711,8 +2727,10 @@ function viewTechnicians(){
       '<h2>الفنيون وسجلاتهم</h2><p>لكل فني سجل يجمع أوامره وقطع الغيار التي صرفها وتوزيع عمله عبر الأشهر.</p>'+
     '</div><div class="sp">'+(canManageAny()?'<button class="btn pri" id="addTech"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>إضافة فني</button>':'')+'</div></div>'+
     '<section class="card"><div class="card-h"><h3>الفنيون</h3><span class="chip">'+fmt(list.length)+'</span></div><div class="card-b">'+
-      (list.length? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>الفني</th><th>التخصص</th><th>الموقع</th><th>الهاتف</th>'+
-        '<th class="r">إجمالي الأوامر</th><th class="r">هذا الشهر</th><th class="r">قيد العمل</th><th></th></tr></thead><tbody>'+
+      (list.length? '<div class="tbl-wrap"><table class="tbl"><thead><tr>'+
+        techSortHead("name","الفني")+techSortHead("specialty","التخصص")+'<th>الموقع</th>'+techSortHead("phone","الهاتف")+
+        techSortHead("total","إجمالي الأوامر","r")+techSortHead("month","هذا الشهر","r")+techSortHead("openC","قيد العمل","r")+
+        '<th></th></tr></thead><tbody>'+
         list.map(t=>{ const s=techStats(t.name);
           return '<tr class="clickable" data-tech="'+esc(t.name)+'">'+
             '<td><b>'+esc(t.name)+'</b>'+(t.active===false?' <span class="chip">غير نشط</span>':'')+'</td>'+
@@ -2731,6 +2749,12 @@ function viewTechnicians(){
     techMapCard(),
     mount(root){
       mountTechMap(root);
+      $$("[data-tsort]",root).forEach(th=>th.onclick=()=>{
+        const k=th.dataset.tsort;
+        if(TechSort.key===k) TechSort.dir = TechSort.dir==="desc" ? "asc" : "desc";
+        else { TechSort.key=k; TechSort.dir = (k==="name"||k==="specialty"||k==="phone") ? "asc" : "desc"; }
+        render();
+      });
       const at=$("#addTech",root); if(at) at.onclick=()=>techForm(null);
       $$("[data-edit-tech]",root).forEach(b=>b.onclick=e=>{ e.stopPropagation(); techForm(byId(Store.list("technicians"),b.dataset.editTech)); });
       $$("[data-tech]",root).forEach(el=>el.onclick=()=>openTechLog(el.dataset.tech));
@@ -4834,8 +4858,9 @@ function render(){
   if(!Access.bothSites() && App.site!==homeSite()) App.site=homeSite();
   /* تُفتح قاعدة المركز الحكومي وحدها */
   Store.openSites(allowedSites());
-  if(["chief","settings","places","warehouse"].indexOf(App.view)>=0 && !Access.isChief()) App.view="dashboard";
-  if(App.view==="supervisor" && !canManageAny()) App.view="dashboard";
+  /* لوحة المتابعة والمخزن وبدل الموقع والإعدادات من صلاحية رئيس الفريق وحده */
+  if(["chief","settings","places","warehouse","dashboard"].indexOf(App.view)>=0 && !Access.isChief()) App.view="records";
+  if(App.view==="supervisor" && !canManageAny()) App.view="records";
   if(Access.isChief() && CHIEF_VIEWS.indexOf(App.view)<0) App.view="chief";
   renderNav(); renderTop();
   const page=$("#page");
