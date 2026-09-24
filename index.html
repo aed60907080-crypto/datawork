@@ -2262,14 +2262,15 @@ async function openRecord(id){
     '</div>';
   openModal({
     title:"أمر صيانة "+(r.no||""), size:"lg", body:body,
-    actions:[
+    /* رئيس الفريق يطّلع ويعتمد، والتعديل والحذف من المركز الحكومي */
+    actions:(Access.isChief() ? [] : [
       {label:"حذف", cls:"btn danger", act:()=>{
         confirmBox("حذف أمر الصيانة","سيُحذف السجل "+(r.no||"")+" نهائياً. لن تُعاد قطع الغيار المصروفة إلى المخزن تلقائياً.",async()=>{
           await Store.delPhoto(r.site,r.photoId); await Store.remove("records",r.id); toast("تم حذف السجل"); render();
         });
       }},
       {label:"تعديل", cls:"btn", act:()=>{ closeModal(); go("neworder",{edit:r.id}); }}
-    ].concat(
+    ]).concat(
       (Access.isChief() && r.status==="منجز" && !r.approvedAt)
         ? [{label:"اعتماد الأمر", cls:"btn", act:()=>{ closeModal(); approveMany([r.id]); }}] : [],
       [{label:"إغلاق", cls:"btn pri", act:closeModal}]
@@ -3147,15 +3148,48 @@ function sectionsHTML(r){
     '</div>').join("");
 }
 
+/* ---- الأوامر الواردة إلى رئيس الفريق أول بأول ---- */
+/* آخر مرة اطّلع فيها رئيس الفريق على الأوامر */
+function chiefSeenAt(){ return String((Store.access||{}).chiefSeenAt||""); }
+function chiefFeed(){
+  return siteFilter(Store.list("records")).slice()
+    .sort((a,b)=>String(b.updatedAt||b.createdAt||b.date||"").localeCompare(String(a.updatedAt||a.createdAt||a.date||"")));
+}
+function isNewForChief(r){ return String(r.updatedAt||r.createdAt||"") > chiefSeenAt(); }
+function chiefNewCount(){ return chiefFeed().filter(isNewForChief).length; }
+async function chiefMarkSeen(){
+  await Store.saveAccess(Object.assign({}, Store.access, {chiefSeenAt:new Date().toISOString()}));
+  toast("عُلّمت الأوامر كمقروءة"); render();
+}
+
 function viewChief(){
   const inbox=Store.list("reports").slice().sort((a,b)=>String(b.ym||"").localeCompare(String(a.ym||"")));
   const count=s=>inbox.filter(r=>repStatus(r)===s).length;
+  const feed=chiefFeed(), fresh=feed.filter(isNewForChief);
+  const ymNow=ymOf(today());
+  const feedRows=feed.slice(0,40);
+  const feedHTML = feed.length
+    ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>الحالة</th><th>رقم السجل</th><th>التاريخ</th>'+
+      '<th>الجهاز</th><th>الموظف / القسم</th><th>الفني</th><th>نوع الصيانة</th><th>آخر تحديث</th></tr></thead><tbody>'+
+      feedRows.map(r=>{
+        const isNew=isNewForChief(r);
+        return '<tr class="clickable'+(isNew?" unread":"")+'" data-feedrec="'+esc(r.id)+'">'+
+          '<td>'+statusChip(r.status)+(isNew?' <span class="chip warn"><i></i>جديد</span>':'')+'</td>'+
+          '<td><b class="mono">'+esc(r.no||"—")+'</b></td>'+
+          '<td class="mono">'+esc(r.date||"")+'</td>'+
+          '<td>'+esc(r.devType||"—")+(r.serial?'<div style="font-size:11.5px;color:var(--ink-3)" class="mono">'+esc(r.serial)+'</div>':'')+'</td>'+
+          '<td>'+esc(r.employee||"—")+'<div style="font-size:11.5px;color:var(--ink-3)">'+esc(r.dept||"")+'</div></td>'+
+          '<td>'+esc(r.tech||"—")+'</td><td>'+esc(r.mtype||"—")+'</td>'+
+          '<td class="mono">'+esc(String(r.updatedAt||r.createdAt||"").slice(0,16).replace("T"," "))+'</td></tr>';
+      }).join("")+'</tbody></table></div>'+
+      (feed.length>feedRows.length?'<p class="card-sub" style="padding:10px 0 0">تُعرض أحدث '+fmt(feedRows.length)+' أمر من '+fmt(feed.length)+'.</p>':'')
+    : '<div class="empty"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg>لم تُسجَّل أوامر صيانة بعد</div>';
   return {
     html:
     '<div class="page-head"><div>'+
       '<div class="eyebrow">'+esc(SITES[1])+'</div>'+
       '<h2>لوحة رئيس الفريق</h2>'+
-      '<p>متابعة التقارير الشهرية الواردة من المركز الحكومي، ومراجعتها وتعديلها واعتمادها أو إعادتها للتعديل.</p>'+
+      '<p>أوامر الصيانة تصلك أول بأول من المركز الحكومي، ومعها التقارير الشهرية لمراجعتها واعتمادها.</p>'+
     '</div><div class="sp"><button class="btn" data-go="reports">التقرير الشهري ←</button></div></div>'+
 
     '<div class="chief-band">'+
@@ -3168,6 +3202,8 @@ function viewChief(){
     '</div>'+
 
     '<div class="tiles">'+
+      tile("أوامر جديدة", fmt(fresh.length), fresh.length?"لم تطّلع عليها بعد":"اطّلعت على كل الأوامر", fresh.length?"warn":"ok")+
+      tile("أوامر هذا الشهر", fmt(feed.filter(r=>ymOf(r.date)===ymNow).length), "من "+fmt(feed.length)+" أمر مسجّل")+
       tile("تقارير واردة", fmt(inbox.length), "كل الأشهر", "accent")+
       tile("جديدة", fmt(count("جديد")), count("جديد")?"بحاجة إلى مراجعة":"لا يوجد جديد", count("جديد")?"warn":"")+
       tile("قيد المراجعة", fmt(count("قيد المراجعة")), "فُتحت ولم تُعتمد")+
@@ -3175,7 +3211,14 @@ function viewChief(){
       tile("مُعادة للتعديل", fmt(count("مُعاد للتعديل")), "بانتظار المركز الحكومي", count("مُعاد للتعديل")?"crit":"")+
     '</div>'+
 
-    '<section class="card"><div class="card-h"><h3>التقارير الشهرية</h3>'+
+    '<section class="card"><div class="card-h"><h3>أوامر الصيانة الواردة</h3>'+
+      '<span class="chip'+(fresh.length?" warn":" ok")+'"><i></i>'+(fresh.length?fmt(fresh.length)+" جديد":"لا جديد")+'</span>'+
+      '<div class="sp">'+(fresh.length?'<button class="btn sm" id="chiefSeen">تعليم الكل كمقروء</button>':'')+
+        '<button class="btn sm ghost" id="chiefXl">حفظ Excel</button></div></div>'+
+      '<div class="card-sub">كل أمر يُسجَّل أو يُعدَّل في المركز الحكومي يظهر هنا مباشرة. اضغط أي صف لعرض تفاصيله.</div>'+
+      '<div class="card-b" style="padding-top:8px">'+feedHTML+'</div></section>'+
+
+    '<section class="card" style="margin-top:14px"><div class="card-h"><h3>التقارير الشهرية</h3>'+
       '<span class="chip'+(count("جديد")?" warn":"")+'">'+fmt(count("جديد"))+' جديد</span></div>'+
       '<div class="card-b" style="padding-top:8px">'+(inbox.length
         ? '<div class="tbl-wrap"><table class="tbl"><thead><tr><th>الشهر</th><th>رقم التقرير</th>'+
@@ -3196,6 +3239,9 @@ function viewChief(){
     mount(root){
       $$("[data-go]",root).forEach(b=>b.onclick=()=>go(b.dataset.go));
       $$("[data-openrep]",root).forEach(b=>b.onclick=()=>openReportDoc(b.dataset.openrep));
+      $$("[data-feedrec]",root).forEach(tr=>tr.onclick=()=>openRecord(tr.dataset.feedrec));
+      const cs=$("#chiefSeen",root); if(cs) cs.onclick=()=>chiefMarkSeen();
+      const cx=$("#chiefXl",root); if(cx) cx.onclick=()=>saveAllExcel();
       const nm=$("#chiefNmSave",root);
       if(nm) nm.onclick=async()=>{
         const v=$("#chiefNm",root).value.trim();
@@ -3314,6 +3360,7 @@ function openReportDoc(id){
   });
 }
 
+const ChiefWatch={n:null};
 const LATE_DAYS=7;
 function daysSince(d){
   const t=new Date(String(d)+"T00:00:00").getTime();
@@ -4503,6 +4550,7 @@ function renderNav(){
     warehouse: lowStock().length,
     technicians: Store.list("technicians").length
   };
+  if(Access.isChief()) counts.chief=chiefNewCount(); /* الأوامر التي لم يطّلع عليها بعد */
   $("#navList").innerHTML=VIEWS.filter(v=>Access.isChief() ? CHIEF_VIEWS.indexOf(v.k)>=0 : (!v.only || (v.only==="admin" && canManageAny()))).map(v=>
     '<button class="nav-b" data-view="'+v.k+'"'+(App.view===v.k?' aria-current="page"':'')+'>'+
       '<svg class="ic" viewBox="0 0 24 24">'+ICONS[v.k]+'</svg>'+esc(v.k==="supervisor"?managerTitle():v.t)+
@@ -4735,6 +4783,12 @@ function onStoreChange(){
     }
   }
   Store.openSites(allowedSites());
+  /* وصول أوامر جديدة لرئيس الفريق والصفحة مفتوحة: تنبيه فوري */
+  if(Access.isChief() && Store.sitesReady){
+    const c=chiefNewCount();
+    if(ChiefWatch.n!==null && c>ChiefWatch.n) toast("وصل "+fmt(c-ChiefWatch.n)+" أمر صيانة جديد");
+    ChiefWatch.n=c;
+  }else ChiefWatch.n=null;
   const busy = !$("#veil").hidden || App.view==="neworder";
   renderNav(); renderTop();
   $("#storeDot").classList.toggle("live", Store.remote());
