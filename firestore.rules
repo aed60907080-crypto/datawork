@@ -1,15 +1,15 @@
 rules_version = '2';
 
 // قواعد أمان سجل صيانة الأجهزة — المركز الحكومي
-// استبدل YOUR-PROJECT.firebaseapp.com بقيمة authDomain لمشروعك قبل النشر.
+// مشروع datawork-dfa0e — تُلصق هذه القواعد في Firestore ← Rules ← Publish.
 service cloud.firestore {
   match /databases/{database}/documents {
 
     function email() {
       return request.auth != null ? request.auth.token.email : '';
     }
-    function isGov()   { return email() == 'gov@YOUR-PROJECT.firebaseapp.com'; }
-    function isChief() { return email() == 'chief@YOUR-PROJECT.firebaseapp.com'; }
+    function isGov()   { return email() == 'gov@datawork-dfa0e.firebaseapp.com'; }
+    function isChief() { return email() == 'chief@datawork-dfa0e.firebaseapp.com'; }
     function isStaff() { return isGov() || isChief(); }
 
     // قاعدة المركز الحكومي: حساب المركز ورئيس الفريق فقط

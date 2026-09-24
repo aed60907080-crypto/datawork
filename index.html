@@ -681,13 +681,16 @@ const SITE_CODE = {"المبنى الرئيسي":"MB","المركز الحكوم
    ربط Firebase — تُلصق هنا إعدادات تطبيق الويب من Project settings.
    عند تركها فارغة يعمل النظام بالتخزين المحلي (أو بقاعدة claude.ai داخلها).
    ============================================================ */
+/* مشروع Firebase الجاهز: datawork-dfa0e — تُفعَّل القاعدة المشتركة بوضع apiKey أدناه
+   بعد إنشاء حسابي gov@datawork-dfa0e.firebaseapp.com و chief@datawork-dfa0e.firebaseapp.com
+   ونشر قواعد firestore.rules. */
 const FIREBASE_CONFIG = {
   apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
+  authDomain: "datawork-dfa0e.firebaseapp.com",
+  projectId: "datawork-dfa0e",
+  storageBucket: "datawork-dfa0e.firebasestorage.app",
+  messagingSenderId: "727686331379",
+  appId: "1:727686331379:web:353b7ad60368f2012d3086"
 };
 const FIREBASE_SDK = "https://www.gstatic.com/firebasejs/10.12.2/";
 /* حساب Firebase لكل جهة: <الاسم>@<authDomain> — تُنشأ من Authentication في Firebase Console */
@@ -3385,7 +3388,11 @@ function backupData(){
   return data;
 }
 function saveAllExcel(){
-  return xlRun("البيانات", async wb=>{
+  return xlRun("البيانات", async wb=>{ buildAllSheets(wb); return "بيانات-صيانة-الأجهزة-"+today()+".xlsx"; });
+}
+/* كل أوراق الملف: الجداول المنسّقة + ورقة البيانات المخفية */
+function buildAllSheets(wb){
+  {
     const recs=siteFilter(Store.list("records"));
     xlRecordsSheet(wb, "سجل الصيانة", "سجل صيانة الأجهزة — كامل", recs);
     xlSummarySheet(wb, "ملخص", "ملخص عام", xlSub(fmt(recs.length)+" أمر"), recs);
@@ -3412,8 +3419,122 @@ function saveAllExcel(){
     const ds=wb.addWorksheet(XL_DATA_SHEET);
     for(let i=0, r=1; i<json.length; i+=30000, r++) ds.getCell(r,1).value=json.slice(i,i+30000);
     ds.state="veryHidden";
-    return "بيانات-صيانة-الأجهزة-"+today()+".xlsx";
+  }
+}
+
+/* ============================================================
+   الحفظ التلقائي في ملف Excel على الجهاز
+   يُربط الملف مرة واحدة، ثم يكتب النظام فيه بعد كل تغيير في البيانات.
+   يحتاج Chrome أو Edge على الحاسب (File System Access API).
+   ============================================================ */
+const AutoXL={handle:null, name:"", busy:false, pending:false, timer:null, last:null, sig:"", needPerm:false};
+function autoXlSupported(){ try{ return typeof window.showSaveFilePicker==="function" && window.isSecureContext; }catch(e){ return false; } }
+function autoXlIdb(){
+  return new Promise((res,rej)=>{
+    const r=indexedDB.open("mpw-autoxl",1);
+    r.onupgradeneeded=()=>{ try{ r.result.createObjectStore("h"); }catch(e){} };
+    r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error);
   });
+}
+async function autoXlKeep(mode,val){
+  try{
+    const db=await autoXlIdb();
+    return await new Promise((res,rej)=>{
+      const tx=db.transaction("h", mode==="get"?"readonly":"readwrite"), os=tx.objectStore("h");
+      const rq = mode==="get" ? os.get("file") : (mode==="put" ? os.put(val,"file") : os.delete("file"));
+      rq.onsuccess=()=>res(rq.result); rq.onerror=()=>rej(rq.error);
+    });
+  }catch(e){ console.warn("autoxl-idb", e); return null; }
+}
+/* بصمة البيانات: تتغيّر فقط عند تغيّر فعلي يستحق الكتابة */
+function autoXlSig(){
+  return COLS.map(c=>{
+    const rows=Store.list(c);
+    let last=""; rows.forEach(r=>{ if(String(r.updatedAt||"")>last) last=String(r.updatedAt||""); });
+    return rows.length+":"+last;
+  }).join("|");
+}
+async function autoXlPick(){
+  if(!autoXlSupported()){ toast("الحفظ التلقائي يعمل في Chrome أو Edge على الحاسب"); return; }
+  try{
+    const h=await window.showSaveFilePicker({
+      suggestedName:"بيانات-صيانة-الأجهزة.xlsx",
+      types:[{description:"ملف Excel", accept:{"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet":[".xlsx"]}}]
+    });
+    AutoXL.handle=h; AutoXL.name=h.name||""; AutoXL.needPerm=false; AutoXL.sig="";
+    await autoXlKeep("put",h);
+    toast("رُبط ملف الحفظ التلقائي — يُحدَّث بعد كل تغيير");
+    await autoXlWrite(true);
+    render();
+  }catch(e){
+    if(e && (e.name==="AbortError"||e.name==="NotAllowedError")) return;
+    console.warn("autoxl-pick", e); toast("تعذّر ربط الملف");
+  }
+}
+async function autoXlStop(){
+  AutoXL.handle=null; AutoXL.name=""; AutoXL.last=null; AutoXL.needPerm=false;
+  clearTimeout(AutoXL.timer);
+  await autoXlKeep("del");
+  toast("أُوقف الحفظ التلقائي"); render();
+}
+async function autoXlResume(){
+  if(!AutoXL.handle) return;
+  try{
+    const p=await AutoXL.handle.requestPermission({mode:"readwrite"});
+    if(p!=="granted"){ toast("لم يُسمح بالكتابة في الملف"); return; }
+    AutoXL.needPerm=false; AutoXL.sig="";
+    await autoXlWrite(true); toast("استُؤنف الحفظ التلقائي"); render();
+  }catch(e){ console.warn("autoxl-perm", e); }
+}
+async function autoXlWrite(force){
+  if(!AutoXL.handle) return;
+  if(AutoXL.busy){ AutoXL.pending=true; return; }
+  const sig=autoXlSig();
+  if(!force && sig===AutoXL.sig) return;
+  AutoXL.busy=true;
+  try{
+    const p=await AutoXL.handle.queryPermission({mode:"readwrite"});
+    if(p!=="granted"){ AutoXL.needPerm=true; return; }
+    const ExcelJS=await xlsxLib();
+    const wb=new ExcelJS.Workbook();
+    wb.creator="سجل صيانة الأجهزة — "+Access.label();
+    wb.created=new Date(); wb.views=[{rightToLeft:true}];
+    buildAllSheets(wb);
+    const buf=await wb.xlsx.writeBuffer();
+    const w=await AutoXL.handle.createWritable();
+    await w.write(buf); await w.close();
+    AutoXL.sig=sig; AutoXL.last=new Date(); AutoXL.needPerm=false;
+    const el=$("#autoXlState"); if(el) el.textContent=autoXlStateText();
+  }catch(e){ console.warn("autoxl-write", e); }
+  finally{
+    AutoXL.busy=false;
+    if(AutoXL.pending){ AutoXL.pending=false; setTimeout(()=>autoXlWrite(true), 400); }
+  }
+}
+/* بعد كل تغيير في البيانات: كتابة مؤجَّلة كي لا تتكرر مع كل حفظ */
+function autoXlSchedule(){
+  if(!AutoXL.handle || !Access.in() || !Store.sitesReady) return;
+  clearTimeout(AutoXL.timer);
+  AutoXL.timer=setTimeout(()=>autoXlWrite(false), 3000);
+}
+function autoXlStateText(){
+  if(!AutoXL.handle) return "غير مفعّل";
+  if(AutoXL.needPerm) return "الملف مرتبط — يحتاج السماح بالكتابة";
+  const t=AutoXL.last;
+  const p=v=>String(v).padStart(2,"0");
+  return "يحفظ في «"+(AutoXL.name||"ملف Excel")+"»"+(t?" · آخر حفظ "+p(t.getHours())+":"+p(t.getMinutes()):"");
+}
+async function autoXlRestore(){
+  if(!autoXlSupported()) return;
+  const h=await autoXlKeep("get");
+  if(!h) return;
+  AutoXL.handle=h; AutoXL.name=h.name||"";
+  try{
+    const p=await h.queryPermission({mode:"readwrite"});
+    if(p==="granted"){ autoXlWrite(true); }
+    else AutoXL.needPerm=true;
+  }catch(e){ AutoXL.needPerm=true; }
+  render();
 }
 /* قراءة ملف محفوظ من النظام: Excel (بورقة البيانات المخفية) أو نسخة JSON */
 async function readBackupFile(f){
@@ -3510,6 +3631,19 @@ function viewSettings(){
           '<input type="file" accept=".xlsx,.json,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/json" id="impFile" hidden>'+
           '<button class="btn ghost" id="expAll">نسخة احتياطية (JSON)</button>'+
         '</div>'+
+        '<div class="note" style="margin-top:14px;border-inline-start-color:'+(AutoXL.handle?"var(--ok)":"var(--line-2)")+'">'+
+          '<b>الحفظ التلقائي في ملف Excel</b>'+
+          '<div id="autoXlState" style="margin-top:4px">'+esc(autoXlStateText())+'</div>'+
+          (autoXlSupported()
+            ? '<div style="display:flex;gap:9px;flex-wrap:wrap;margin-top:10px">'+
+                (AutoXL.needPerm?'<button class="btn" id="autoXlResume">السماح ومتابعة الحفظ</button>':'')+
+                '<button class="btn'+(AutoXL.handle?"":" pri")+'" id="autoXlPick">'+(AutoXL.handle?"تغيير الملف":"ربط ملف للحفظ التلقائي")+'</button>'+
+                (AutoXL.handle?'<button class="btn ghost danger" id="autoXlStop">إيقاف</button>':'')+
+              '</div>'+
+              '<div style="margin-top:8px;color:var(--ink-3)">اختر ملفاً مرة واحدة، ويُحدّثه النظام بعد كل تغيير في البيانات بثوانٍ. '+
+              'ضع الملف في مجلد OneDrive أو Google Drive ليصل إلى بقية الأجهزة.</div>'
+            : '<div style="margin-top:8px;color:var(--ink-3)">هذه الميزة تعمل في Chrome أو Edge على الحاسب. على الهاتف استخدم زر «حفظ Excel».</div>')+
+        '</div>'+
         '<p class="note" style="margin-top:14px">«حفظ Excel» ينشئ ملفاً واحداً فيه كل السجلات والمخزن والحركات والفنيين والموظفين ومواقع العمل مع القوائم. '+
           'افتح الملف نفسه بزر «فتح من Excel» على أي جهاز أو متصفح لنقل البيانات إليه: الجديد يُضاف والموجود يُحدَّث، ولا يُحذف شيء. '+
           'صور السيريال لا تُدرج لأنها كبيرة الحجم.'+
@@ -3568,6 +3702,9 @@ function viewSettings(){
       };
       $("#expXlsx",root).onclick=()=>saveAllExcel();
       $("#expAll",root).onclick=()=>download("نسخة-احتياطية-"+today()+".json", JSON.stringify(backupData(),null,2), "application/json");
+      const axp=$("#autoXlPick",root); if(axp) axp.onclick=()=>autoXlPick();
+      const axs=$("#autoXlStop",root); if(axs) axs.onclick=()=>autoXlStop();
+      const axr=$("#autoXlResume",root); if(axr) axr.onclick=()=>autoXlResume();
       $("#impAll",root).onclick=()=>$("#impFile",root).click();
       $("#impFile",root).onchange=e=>{ const f=e.target.files[0]; e.target.value=""; openBackupFile(f); };
     }
@@ -4641,7 +4778,8 @@ $("#themeBtn").onclick=()=>{
 };
 render();
 Store.on(onStoreChange);
-Store.init().then(()=>{ onStoreChange(); });
+Store.on(autoXlSchedule);
+Store.init().then(()=>{ onStoreChange(); autoXlRestore(); });
 })();
 </script>
 
