@@ -896,6 +896,9 @@ const Store = {
     firebase.initializeApp(FIREBASE_CONFIG);
     this.db=firebase.firestore();
     this.db.settings({ignoreUndefinedProperties:true});
+    /* العمل بدون إنترنت: البيانات تبقى على الجهاز وتُرفع للقاعدة عند رجوع الشبكة */
+    try{ await this.db.enablePersistence({synchronizeTabs:true}); }
+    catch(e){ console.warn("offline-persistence", e && e.code); }
     this.auth=firebase.auth();
     await new Promise(res=>{
       let first=true;
@@ -945,11 +948,31 @@ const Store = {
     }catch(e){}
     /* تجربة الكلمة كما كُتبت ثم بتخطيط لوحة المفاتيح الآخر */
     const tries=[pass].concat([kbToArabic(pass), kbToLatin(pass)].filter((v,i,a)=>v && v!==pass && a.indexOf(v)===i));
+    let last="";
     for(let i=0;i<tries.length;i++){
       try{ await this.auth.signInWithEmailAndPassword(email,tries[i]); return {ok:true, variant:i>0}; }
-      catch(e){ if(!/invalid-credential|wrong-password|invalid-login/.test(String(e&&e.code))) return {ok:false, msg:authMsg(e&&e.code)}; }
+      catch(e){
+        last=String(e&&e.code||"");
+        if(!/invalid-credential|wrong-password|invalid-login|user-not-found/.test(last)) return {ok:false, msg:authMsg(last)};
+      }
     }
-    return {ok:false, msg:authMsg("auth/invalid-credential")};
+    /* أول استخدام لهذه الجهة: يُنشأ حسابها بكلمة السر المكتوبة الآن */
+    if(pass.length>=6){
+      try{
+        await this.auth.createUserWithEmailAndPassword(email,pass);
+        return {ok:true, created:true};
+      }catch(e){
+        const c=String(e&&e.code||"");
+        if(/email-already-in-use/.test(c))
+          return {ok:false, msg:"كلمة السر غير صحيحة لهذه الجهة. إن نسيتها: احذف حساب "+email+" من Firebase ← Authentication ← Users، ثم ادخل هنا بكلمة سر جديدة ليُنشأ من جديد."};
+        if(/weak-password/.test(c)) return {ok:false, msg:"كلمة السر يجب ألا تقل عن ٦ أحرف."};
+        if(/admin-restricted-operation|operation-not-allowed/.test(c))
+          return {ok:false, msg:"إنشاء الحسابات موقوف في Firebase ← Authentication ← Settings ← User actions. فعّله مؤقتاً ليُنشأ حساب هذه الجهة."};
+        return {ok:false, msg:authMsg(c)};
+      }
+    }
+    return {ok:false, msg: last==="auth/too-many-requests" ? authMsg(last)
+      : "كلمة السر غير صحيحة لهذه الجهة، أو أنها أقل من ٦ أحرف عند أول ضبط."};
   },
   async authChangePassword(cur,next){
     const u=this.auth.currentUser;
@@ -1115,6 +1138,13 @@ const Store = {
   },
 
   /* ---------- كتابة: كل مستند إلى قاعدة موقعه ---------- */
+  /* الكتابة بدون انتظار الخادم: Firestore يحفظ على الجهاز فوراً ويرفعها عند توفر الشبكة */
+  _write(p){
+    if(!p || typeof p.then!=="function") return Promise.resolve();
+    p.catch(e=>console.warn("write", e && (e.code||e.message)));
+    if(this.mode!=="firebase") return p;
+    return Promise.race([p.catch(()=>null), new Promise(r=>setTimeout(r,1200))]);
+  },
   async save(col,obj){
     const o=Object.assign({},obj);
     if(!o.id) o.id=uid(col.slice(0,3));
@@ -1127,9 +1157,9 @@ const Store = {
     const prev=this._where(col,o.id);
     if(this.remote()){
       const body=Object.assign({},o); delete body.id;
-      await this.db.collection(colPath(col,code)).doc(o.id).set(body);
+      await this._write(this.db.collection(colPath(col,code)).doc(o.id).set(body));
       /* نُقل إلى موقع آخر: يُحذف من قاعدة الموقع السابق */
-      if(prev!==undefined && prev!==code) await this.db.collection(colPath(col,prev)).doc(o.id).delete();
+      if(prev!==undefined && prev!==code) await this._write(this.db.collection(colPath(col,prev)).doc(o.id).delete());
     }else{
       this._parts[col]=this._parts[col]||{};
       if(prev!==undefined && prev!==code){
@@ -1146,7 +1176,7 @@ const Store = {
   async remove(col,id){
     const code=this._where(col,id);
     if(code===undefined) return;
-    if(this.remote()){ await this.db.collection(colPath(col,code)).doc(id).delete(); }
+    if(this.remote()){ await this._write(this.db.collection(colPath(col,code)).doc(id).delete()); }
     else{
       this._parts[col][code]=this._parts[col][code].filter(x=>x.id!==id);
       this._flush(col,code); this._rebuild(col); this.emit();
@@ -1154,13 +1184,13 @@ const Store = {
   },
   async saveConfig(cfg){
     this.config=cfg;
-    if(this.remote()){ await this.db.doc("config/lists").set(cfg); }
+    if(this.remote()){ await this._write(this.db.doc("config/lists").set(cfg)); }
     else{ try{ localStorage.setItem("mpw.config",JSON.stringify(cfg)); }catch(e){} }
     this.emit();
   },
   async saveAccess(acc){
     this.access=acc;
-    if(this.remote()){ await this.db.doc("config/access").set(acc); }
+    if(this.remote()){ await this._write(this.db.doc("config/access").set(acc)); }
     else{ try{ localStorage.setItem("mpw.access",JSON.stringify(acc)); }
           catch(e){ toast("تعذّر حفظ كلمات السر على هذا المتصفح"); } }
     this.emit();
@@ -1169,7 +1199,7 @@ const Store = {
   /* ---------- الصور: مستند منفصل لكل صورة داخل قاعدة موقع السجل ---------- */
   async savePhoto(site,id,dataUrl){
     const code=SITE_CODE[site]||"";
-    if(this.remote()){ await this.db.collection(colPath("photos",code)).doc(id).set({dataUrl:dataUrl, at:new Date().toISOString()}); }
+    if(this.remote()){ await this._write(this.db.collection(colPath("photos",code)).doc(id).set({dataUrl:dataUrl, at:new Date().toISOString()})); }
     else{
       try{ localStorage.setItem(this._key("photo."+id,code),dataUrl); }
       catch(e){ toast("تعذّر حفظ الصورة محلياً — حُفظ السجل بدونها"); return false; }
@@ -1198,18 +1228,24 @@ const Store = {
       .filter(r=>String(r.no||"").indexOf(pre)===0)
       .reduce((m,r)=>Math.max(m, n(String(r.no).split("-")[2])),0);
     if(this.mode==="firebase"){
-      const ref=this.db.doc("sites/"+SITE_CODE[site]+"/meta/counters");
-      try{
-        const next=await this.db.runTransaction(async tx=>{
-          const s=await tx.get(ref);
-          const data=(s.exists ? s.data() : {}) || {};
-          const nx=Math.max(n(data[pre]), localMax())+1;
-          const upd={}; upd[pre]=nx;
-          tx.set(ref, upd, {merge:true});
-          return nx;
-        });
-        return pre+String(next).padStart(4,"0");
-      }catch(e){ console.warn("counter", e); }
+      /* العدّاد على الخادم يحتاج شبكة: بدونها يُرقَّم الأمر من السجلات الموجودة على الجهاز */
+      if(netOnline()){
+        const ref=this.db.doc("sites/"+SITE_CODE[site]+"/meta/counters");
+        try{
+          const next=await Promise.race([
+            this.db.runTransaction(async tx=>{
+              const s=await tx.get(ref);
+              const data=(s.exists ? s.data() : {}) || {};
+              const nx=Math.max(n(data[pre]), localMax())+1;
+              const upd={}; upd[pre]=nx;
+              tx.set(ref, upd, {merge:true});
+              return nx;
+            }),
+            new Promise(r=>setTimeout(()=>r(null), 4000))
+          ]);
+          if(next) return pre+String(next).padStart(4,"0");
+        }catch(e){ console.warn("counter", e && (e.code||e.message)); }
+      }
     }
     if(this.mode==="db"){
       const ref=this.db.doc("sites/"+SITE_CODE[site]+"/meta/counters"), holder=uid("h");
@@ -3383,6 +3419,23 @@ function openReportDoc(id){
   });
 }
 
+/* ---- حالة الشبكة: بدون إنترنت تُحفظ البيانات على الجهاز وفي ملف Excel، وتُرفع للقاعدة عند عودتها ---- */
+const Net={on: (typeof navigator!=="undefined" && "onLine" in navigator) ? navigator.onLine : true};
+function netOnline(){ return Net.on; }
+function netStateText(){
+  if(Store.mode==="local") return "تخزين محلي على هذا المتصفح";
+  if(!netOnline()) return "بدون إنترنت — يُحفظ على الجهاز"+(AutoXL.handle?" وفي ملف Excel":"")+" ويُرفع عند عودة الشبكة";
+  return "قاعدة البيانات المشتركة"+(Store.mode==="firebase"?" · Firebase":"")+(AutoXL.handle?" + ملف Excel":"");
+}
+function renderNetState(){
+  const dot=$("#storeDot"); if(!dot) return;
+  dot.classList.toggle("live", Store.remote() && netOnline());
+  const s=dot.querySelector("span"); if(s) s.textContent=netStateText();
+}
+if(typeof window!=="undefined"){
+  window.addEventListener("online", ()=>{ Net.on=true; renderNetState(); toast("عادت الشبكة — تُرفع البيانات إلى قاعدة البيانات"); });
+  window.addEventListener("offline", ()=>{ Net.on=false; renderNetState(); toast("انقطع الإنترنت — يواصل النظام الحفظ على الجهاز"+(AutoXL.handle?" وفي ملف Excel":"")); });
+}
 const ChiefWatch={n:null};
 const LATE_DAYS=7;
 function daysSince(d){
@@ -4814,9 +4867,7 @@ function onStoreChange(){
   }else ChiefWatch.n=null;
   const busy = !$("#veil").hidden || App.view==="neworder";
   renderNav(); renderTop();
-  $("#storeDot").classList.toggle("live", Store.remote());
-  $("#storeDot").querySelector("span").textContent =
-    (Store.open.length>1 ? "القاعدتان مجمّعتان" : "قاعدة "+(Store.openNames()[0]||"الموقع")) + (Store.mode==="firebase" ? " · Firebase" : (Store.mode==="db" ? "" : " — محلي"));
+  renderNetState();
   if(!busy) render();
 }
 
